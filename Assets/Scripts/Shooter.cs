@@ -89,7 +89,12 @@ namespace BubbleShooter
         void Reload(bool first = false)
         {
             if (first) { Current = PickColor(); Next = PickColor(); }
-            else { Current = Next; Next = PickColor(); }
+            else
+            {
+                Current = Next;
+                // ~8% chance the next bubble is a wildcard Rainbow
+                Next = Random.value < 0.08f ? BubbleColor.Rainbow : PickColor();
+            }
             BombArmed = false;
             currentGo.transform.position = muzzle;
             currentGo.transform.localScale = Vector3.one * Radius * 2f;

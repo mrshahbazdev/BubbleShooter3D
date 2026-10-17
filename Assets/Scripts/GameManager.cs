@@ -140,11 +140,6 @@ namespace BubbleShooter
             }
         }
 
-        void NextProjectileIfPlaying()
-        {
-            if (State == GameState.Playing) Shooter.OnProjectileDone();
-        }
-
         public void OnProjectileLost(Projectile p)
         {
             Destroy(p.gameObject);

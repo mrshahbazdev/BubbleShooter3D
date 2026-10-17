@@ -12,10 +12,30 @@ namespace BubbleShooter
             var start = board.Get(r, c);
             if (start == null) return new List<Vector2Int>();
             BubbleColor target = start.Color;
-            bool Matches(Bubble b) =>
-                b != null && (b.Color == target || target == BubbleColor.Rainbow ||
-                              (target != BubbleColor.Bomb && b.Color == BubbleColor.Rainbow));
+            if (target == BubbleColor.Rainbow)
+            {
+                // A rainbow shot adopts the neighbor color giving the biggest cluster.
+                var best = new List<Vector2Int>();
+                var candidates = new HashSet<BubbleColor>();
+                foreach (var n in board.Neighbors(r, c))
+                {
+                    var nb = board.Get(n.x, n.y);
+                    if (nb != null && BubblePalette.IsPlayable(nb.Color)) candidates.Add(nb.Color);
+                }
+                foreach (var col in candidates)
+                {
+                    var cl = Cluster(board, r, c, col);
+                    if (cl.Count > best.Count) best = cl;
+                }
+                return best;
+            }
+            return Cluster(board, r, c, target);
+        }
 
+        static List<Vector2Int> Cluster(BubbleBoard board, int r, int c, BubbleColor target)
+        {
+            bool Matches(Bubble b) =>
+                b != null && (b.Color == target || b.Color == BubbleColor.Rainbow);
             var seen = new HashSet<Vector2Int>();
             var cluster = new List<Vector2Int>();
             var stack = new Stack<Vector2Int>();
