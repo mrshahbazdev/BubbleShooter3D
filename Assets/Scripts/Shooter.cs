@@ -121,7 +121,7 @@ namespace BubbleShooter
         {
             if (Busy || GameManager.I.State != GameState.Playing) { line.positionCount = 0; return; }
             Vector3 d = AimDir();
-            barrel.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
+            barrel.transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
             DrawTrajectory(muzzle, d);
             currentGo.transform.position = muzzle;
 

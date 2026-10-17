@@ -39,7 +39,7 @@ namespace BubbleShooter
                 rainbowPhase += Time.deltaTime * 2f;
                 int i = Mathf.FloorToInt(rainbowPhase) % rainbowStops.Length;
                 int j = (i + 1) % rainbowStops.Length;
-                rend.material.color = Color.Lerp(rainbowStops[i], rainbowStops[j], rainbowPhase % 1f);
+                rend.material.color = UnityEngine.Color.Lerp(rainbowStops[i], rainbowStops[j], rainbowPhase % 1f);
             }
         }
 
