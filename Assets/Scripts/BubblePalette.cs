@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BubbleShooter
 {
-    public enum BubbleColor { Red, Green, Blue, Yellow, Purple, Orange, Bomb, Rainbow }
+    public enum BubbleColor { Red, Green, Blue, Yellow, Purple, Orange, Bomb, Rainbow, Fireball, Lightning }
 
     public static class BubblePalette
     {
@@ -16,6 +16,8 @@ namespace BubbleShooter
             new Color(1.00f, 0.52f, 0.08f), // Orange
             new Color(0.15f, 0.15f, 0.18f), // Bomb
             new Color(0.90f, 0.90f, 0.95f), // Rainbow
+            new Color(1.00f, 0.35f, 0.05f), // Fireball
+            new Color(0.20f, 0.95f, 1.00f), // Lightning
         };
 
         public static bool IsPlayable(BubbleColor c) => (int)c <= (int)BubbleColor.Orange;
@@ -28,11 +30,11 @@ namespace BubbleShooter
             m.SetFloat("_Glossiness", 0.95f);
             m.SetFloat("_Metallic", 0.15f);
             m.EnableKeyword("_EMISSION");
-            m.SetColor("_EmissionColor", baseCol * 0.45f);
+            m.SetColor("_EmissionColor", baseCol * (c == BubbleColor.Fireball || c == BubbleColor.Lightning ? 0.85f : 0.45f));
             return m;
         }
 
-        /// <summary>Transparent white material used for fake specular highlights.</summary>
+        /// <summary>Transparent material used for ghost aim indicator and specular highlights.</summary>
         public static Material TransparentMat(Color color)
         {
             var m = new Material(Shader.Find("Standard"));
@@ -42,6 +44,15 @@ namespace BubbleShooter
             m.EnableKeyword("_ALPHABLEND_ON");
             m.renderQueue = 3000;
             m.color = color;
+            return m;
+        }
+
+        public static Material CreateGhostMaterial(BubbleColor c)
+        {
+            Color baseCol = Colors[(int)c];
+            var m = TransparentMat(new Color(baseCol.r, baseCol.g, baseCol.b, 0.42f));
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", baseCol * 0.5f);
             return m;
         }
 

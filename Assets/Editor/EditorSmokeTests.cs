@@ -72,6 +72,16 @@ namespace BubbleShooter.EditorTools
 
                 Check(MatchSolver.GetRadius(board, 1, 1, 1).Count >= 1, "bomb radius hits cells");
 
+                // --- lightning row solver test ---
+                Check(MatchSolver.GetRow(board, 0).Count >= 1, "lightning GetRow returns row cells");
+
+                // --- powerup palettes and ghost material ---
+                Check(BubblePalette.CreateMaterial(BubbleColor.Fireball) != null, "fireball material created");
+                Check(BubblePalette.CreateMaterial(BubbleColor.Lightning) != null, "lightning material created");
+                Check(BubblePalette.CreateGhostMaterial(BubbleColor.Blue) != null, "ghost aim material created");
+                Check(!BubblePalette.IsPlayable(BubbleColor.Fireball), "fireball is non-playable special");
+                Check(!BubblePalette.IsPlayable(BubbleColor.Lightning), "lightning is non-playable special");
+
                 bool allEmpty = true;
                 foreach (var cell in board.EmptyCellsNear(new Vector3(0, board.TopY, 0)))
                     if (board.Get(cell.x, cell.y) != null) allEmpty = false;

@@ -89,6 +89,13 @@ class Program
         var rad = MatchSolver.GetRadius(board, 1, 1, 1);
         T.Check(rad.Count >= 1, $"bomb radius hits {rad.Count} cells");
 
+        // --- lightning row solver ---
+        T.Check(MatchSolver.GetRow(board, 0).Count >= 1, "lightning GetRow returns row cells");
+
+        // --- powerups playable check ---
+        T.Check(!BubblePalette.IsPlayable(BubbleColor.Fireball), "fireball not in random standard playable pool");
+        T.Check(!BubblePalette.IsPlayable(BubbleColor.Lightning), "lightning not in random standard playable pool");
+
         // --- empty-cell list only returns empty cells ---
         bool allEmpty = true;
         foreach (var cell in board.EmptyCellsNear(new Vector3(0, board.TopY, 0)))

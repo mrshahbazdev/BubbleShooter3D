@@ -115,6 +115,65 @@ namespace BubbleShooter
             Destroy(go);
         }
 
+        public void ElectricBurst(Vector3 pos)
+        {
+            var go = new GameObject("ElectricBurst");
+            go.transform.position = pos;
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(6f, 14f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.18f);
+            main.startColor = new Color(0.3f, 0.95f, 1f, 1f);
+            main.maxParticles = 50;
+            var emission = ps.emission;
+            emission.rateOverTime = 0;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 35) });
+            var psr = go.GetComponent<ParticleSystemRenderer>();
+            psr.material = particleMat;
+            Destroy(go, 1f);
+        }
+
+        public void FireBurst(Vector3 pos)
+        {
+            var go = new GameObject("FireBurst");
+            go.transform.position = pos;
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.7f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(4f, 9f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.1f, 0.28f);
+            main.startColor = new Color(1f, 0.45f, 0.08f, 1f);
+            main.maxParticles = 45;
+            var emission = ps.emission;
+            emission.rateOverTime = 0;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 30) });
+            var psr = go.GetComponent<ParticleSystemRenderer>();
+            psr.material = particleMat;
+            Destroy(go, 1f);
+        }
+
+        public void ShowComboCallout(int combo)
+        {
+            if (combo < 2) return;
+            string text = combo switch
+            {
+                2 => "NICE! x2",
+                3 => "GREAT! x3",
+                4 => "AWESOME! x4",
+                _ => "UNSTOPPABLE! x" + combo
+            };
+            Color col = combo switch
+            {
+                2 => new Color(0.4f, 0.9f, 1f),
+                3 => new Color(1f, 0.85f, 0.2f),
+                4 => new Color(1f, 0.45f, 0.1f),
+                _ => new Color(1f, 0.2f, 0.6f)
+            };
+            Popup(new Vector3(0f, 1.2f, -1f), text, col);
+            Shake(0.12f + combo * 0.04f);
+        }
+
         /// <summary>Camera shake — call once, decays automatically.</summary>
         public void Shake(float amount)
         {

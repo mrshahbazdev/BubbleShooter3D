@@ -227,6 +227,33 @@ namespace BubbleShooter
             }
         }
 
+        public void JiggleNeighbors(int r, int c, Vector3 dir)
+        {
+            foreach (var n in Neighbors(r, c))
+            {
+                var b = Get(n.x, n.y);
+                if (b != null && !b.IsPopping)
+                {
+                    StartCoroutine(JiggleBubble(b.transform, CellToWorld(n.x, n.y), dir.normalized * 0.12f));
+                }
+            }
+        }
+
+        IEnumerator JiggleBubble(Transform t, Vector3 origin, Vector3 offset)
+        {
+            if (t == null) yield break;
+            float dur = 0.18f;
+            float el = 0f;
+            while (el < dur && t != null)
+            {
+                el += Time.deltaTime;
+                float k = Mathf.Sin(el / dur * Mathf.PI * 2f) * (1f - el / dur);
+                t.position = origin + offset * k;
+                yield return null;
+            }
+            if (t != null) t.position = origin;
+        }
+
         public void SeedClear() { rows.Clear(); }
 
         void EnsureRow() { rows.Add(new Bubble[ColsInRow(rows.Count)]); }

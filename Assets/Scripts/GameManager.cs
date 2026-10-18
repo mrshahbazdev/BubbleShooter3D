@@ -6,29 +6,53 @@ namespace BubbleShooter
 {
     public enum GameState { Playing, Won, Lost }
 
-    /// <summary>Score, level progression, win/lose, and the pop/drop resolve loop.</summary>
+    /// <summary>
+    /// Score, level progression, win/lose, power-up effects, and the pop/drop resolve loop.
+    /// </summary>
     public class GameManager : MonoBehaviour
     {
         public static GameManager I { get; private set; }
 
         public GameState State { get; private set; } = GameState.Playing;
         public int Score { get; private set; }
+        public int HighScore { get; private set; }
         public int Level { get; private set; } = 1;
         public int Moves { get; private set; }
         public int Combo { get; private set; }
         public int BombsLeft = 2;
+        public int FireballsLeft = 1;
+        public int LightningsLeft = 1;
+        public bool IsPaused { get; private set; }
 
         public BubbleBoard Board { get; private set; }
         public Shooter Shooter { get; private set; }
 
         int shotsSinceDescend;
-        int ShotsPerDescend => Mathf.Max(3, 7 - Level / 2); // pressure ramps with level
+        public int ShotsPerDescend => Mathf.Max(3, 7 - Level / 2); // pressure ramps with level
+        public int ShotsUntilDescend => Mathf.Max(0, ShotsPerDescend - shotsSinceDescend);
 
         public void Init(BubbleBoard board, Shooter shooter)
         {
             I = this;
             Board = board; Shooter = shooter;
+            HighScore = PlayerPrefs.GetInt("BS3D_HighScore", 0);
             StartLevel(1);
+        }
+
+        void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                TogglePause();
+            }
+        }
+
+        public void TogglePause()
+        {
+            if (State != GameState.Playing) return;
+            IsPaused = !IsPaused;
+            Time.timeScale = IsPaused ? 0f : 1f;
+            if (UIManager.I != null) UIManager.I.ShowPause(IsPaused);
         }
 
         public void StartLevel(int level)
@@ -37,22 +61,28 @@ namespace BubbleShooter
             State = GameState.Playing;
             shotsSinceDescend = 0; Combo = 0; Moves = 0;
             BombsLeft = 1 + level / 2;
+            FireballsLeft = 1 + level / 3;
+            LightningsLeft = 1 + level / 3;
+
             int rows = Mathf.Min(5 + level, 9);
             int colors = Mathf.Min(3 + level, 6);
             Board.TopY = 6.4f;
             Board.SeedRows(rows, colors);
-            UIManager.I.SetHud();
-            UIManager.I.ShowLevelBanner(level);
+            if (UIManager.I != null)
+            {
+                UIManager.I.SetHud();
+                UIManager.I.ShowLevelBanner(level);
+            }
         }
 
         public void OnProjectileSnapped(Projectile p, Vector2Int cell, Vector3 contact)
         {
             var b = Board.PlaceBubble(p.Color, cell.x, cell.y);
-            b.transform.position = contact; // then slide into place
+            b.transform.position = contact;
             StartCoroutine(SlideIn(b, Board.CellToWorld(cell.x, cell.y)));
             Destroy(p.gameObject, 0.05f);
             Moves++;
-            StartCoroutine(Resolve(b));
+            StartCoroutine(Resolve(b, contact));
         }
 
         IEnumerator SlideIn(Bubble b, Vector3 target)
@@ -60,7 +90,6 @@ namespace BubbleShooter
             float t = 0; Vector3 from = b.transform.position;
             while (t < 0.12f) { t += Time.deltaTime; b.transform.position = Vector3.Lerp(from, target, t / 0.12f); yield return null; }
             b.transform.position = target;
-            // squash-and-stretch settle
             Vector3 s = b.transform.localScale;
             float k = 0;
             while (k < 0.15f)
@@ -72,14 +101,44 @@ namespace BubbleShooter
             b.transform.localScale = s;
         }
 
-        IEnumerator Resolve(Bubble placed)
+        public void OnFireballHitBubble(Bubble b)
+        {
+            if (b == null) return;
+            Board.Remove(b.Row, b.Col);
+            EffectsManager.I.FireBurst(b.transform.position);
+            EffectsManager.I.Shake(0.12f);
+            Score += 50;
+            AudioManager.I.PlayPop(Random.Range(2, 6));
+            StartCoroutine(b.PopAnim(0f));
+            if (UIManager.I != null) UIManager.I.SetHud();
+        }
+
+        public void OnFireballComplete(Vector3 ceilPos)
+        {
+            EffectsManager.I.FireBurst(ceilPos);
+            EffectsManager.I.Shockwave(ceilPos);
+            EffectsManager.I.Shake(0.3f);
+            Moves++;
+            StartCoroutine(ResolvePostShot(null));
+        }
+
+        IEnumerator Resolve(Bubble placed, Vector3 contact)
         {
             yield return new WaitForSeconds(0.12f);
             List<Vector2Int> popped;
+
             if (placed.Color == BubbleColor.Bomb)
             {
                 popped = MatchSolver.GetRadius(Board, placed.Row, placed.Col, 1);
                 AudioManager.I.Play("bomb");
+                EffectsManager.I.Shockwave(placed.transform.position);
+                EffectsManager.I.Shake(0.38f);
+            }
+            else if (placed.Color == BubbleColor.Lightning)
+            {
+                popped = MatchSolver.GetRow(Board, placed.Row);
+                AudioManager.I.Play("zap");
+                EffectsManager.I.ElectricBurst(placed.transform.position);
                 EffectsManager.I.Shockwave(placed.transform.position);
                 EffectsManager.I.Shake(0.35f);
             }
@@ -87,10 +146,25 @@ namespace BubbleShooter
             {
                 popped = MatchSolver.GetMatchCluster(Board, placed.Row, placed.Col);
                 if (popped.Count < 3) popped.Clear();
+                Vector3 impactDir = placed.transform.position - contact;
+                Board.JiggleNeighbors(placed.Row, placed.Col, impactDir);
             }
 
+            yield return ResolveClustersAndDrops(popped, placed.transform.position, placed.Color);
+        }
+
+        IEnumerator ResolvePostShot(Bubble placed)
+        {
+            yield return new WaitForSeconds(0.15f);
+            yield return ResolveClustersAndDrops(new List<Vector2Int>(), Vector3.zero, BubbleColor.Red);
+        }
+
+        IEnumerator ResolveClustersAndDrops(List<Vector2Int> popped, Vector3 centerPos, BubbleColor shotColor)
+        {
             int dropped = 0;
-            if (popped.Count >= 3 || placed.Color == BubbleColor.Bomb)
+            bool hadMatches = popped.Count >= 3 || shotColor == BubbleColor.Bomb || shotColor == BubbleColor.Lightning;
+
+            if (hadMatches)
             {
                 Combo++;
                 int i = 0;
@@ -100,12 +174,25 @@ namespace BubbleShooter
                     if (bub == null) continue;
                     Board.Remove(cell.x, cell.y);
                     EffectsManager.I.Burst(bub.transform.position, bub.Color);
-                    StartCoroutine(bub.PopAnim(i++ * 0.03f));
+                    StartCoroutine(bub.PopAnim(i * 0.03f));
+                    AudioManager.I.PlayPop(i);
+                    i++;
                 }
-                AudioManager.I.Play("pop");
-                Score += popped.Count * 10 * Combo;
-                EffectsManager.I.Popup(placed.transform.position,
-                    "+" + popped.Count * 10 * Combo, new Color(1f, 0.85f, 0.2f));
+
+                int points = popped.Count * 10 * Combo;
+                Score += points;
+                UpdateHighScore();
+
+                if (centerPos != Vector3.zero)
+                {
+                    EffectsManager.I.Popup(centerPos, "+" + points, new Color(1f, 0.85f, 0.2f));
+                }
+
+                if (Combo > 1)
+                {
+                    AudioManager.I.Play("combo");
+                    EffectsManager.I.ShowComboCallout(Combo);
+                }
 
                 yield return new WaitForSeconds(0.25f);
                 var floating = MatchSolver.GetFloating(Board);
@@ -119,10 +206,11 @@ namespace BubbleShooter
                 }
                 if (dropped > 0)
                 {
-                    Score += dropped * 25;
+                    int dropPoints = dropped * 25;
+                    Score += dropPoints;
+                    UpdateHighScore();
                     AudioManager.I.Play("drop");
-                    EffectsManager.I.Popup(new Vector3(0f, 0f, 0f),
-                        "+" + dropped * 25 + " DROP", new Color(0.4f, 0.9f, 1f));
+                    EffectsManager.I.Popup(new Vector3(0f, 0f, 0f), "+" + dropPoints + " DROPPED!", new Color(0.4f, 0.9f, 1f));
                 }
                 shotsSinceDescend = 0;
             }
@@ -135,27 +223,48 @@ namespace BubbleShooter
                     shotsSinceDescend = 0;
                     Board.AddTopRow(Mathf.Min(3 + Level, 6));
                     AudioManager.I.Play("descend");
+                    EffectsManager.I.Shake(0.18f);
                 }
             }
 
-            UIManager.I.SetHud(popped.Count, dropped);
+            if (UIManager.I != null) UIManager.I.SetHud(popped.Count, dropped);
 
             if (Board.Count == 0)
             {
                 State = GameState.Won;
                 Score += 500 + Level * 250;
+                UpdateHighScore();
                 AudioManager.I.Play("win");
-                UIManager.I.ShowWin(Score, Level);
+                int stars = CalculateStars(Moves, Level);
+                if (UIManager.I != null) UIManager.I.ShowWin(Score, Level, stars);
             }
             else if (Board.AnyBubbleBelowDeathLine())
             {
                 State = GameState.Lost;
                 AudioManager.I.Play("lose");
-                UIManager.I.ShowLose(Score, Level);
+                if (UIManager.I != null) UIManager.I.ShowLose(Score, Level);
             }
             else
             {
                 Shooter.OnProjectileDone();
+            }
+        }
+
+        public int CalculateStars(int moves, int level)
+        {
+            int par = 12 + level * 2;
+            if (moves <= par) return 3;
+            if (moves <= par + 6) return 2;
+            return 1;
+        }
+
+        void UpdateHighScore()
+        {
+            if (Score > HighScore)
+            {
+                HighScore = Score;
+                PlayerPrefs.SetInt("BS3D_HighScore", HighScore);
+                PlayerPrefs.Save();
             }
         }
 
@@ -184,7 +293,6 @@ namespace BubbleShooter
 
         void ClearBoard()
         {
-            // reset internal rows by re-initting the grid transform children
             var root = Board.transform.Find("Bubbles");
             if (root != null)
                 foreach (Transform child in root) Destroy(child.gameObject);

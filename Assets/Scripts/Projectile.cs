@@ -1,11 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BubbleShooter
 {
     /// <summary>
-    /// Fired bubble: travels in a straight line, reflects off the side walls,
-    /// and reports back when it hits the ceiling or an existing bubble.
-    /// Collision is analytic (distance to cell centers) — deterministic and cheap.
+    /// Fired bubble: travels in a straight line, reflects off side walls,
+    /// and reports back when it hits the ceiling or existing bubbles.
+    /// Supports piercing Fireball, high-speed Lightning, and explosive Bomb shots.
     /// </summary>
     public class Projectile : MonoBehaviour
     {
@@ -17,6 +18,7 @@ namespace BubbleShooter
         BubbleBoard board;
         float radius;
         bool done;
+        readonly HashSet<Bubble> piercedBubbles = new HashSet<Bubble>();
 
         public void Launch(BubbleColor color, bool isBomb, Vector3 origin, Vector3 direction,
                            BubbleBoard board, float radius)
@@ -26,6 +28,7 @@ namespace BubbleShooter
             transform.position = origin;
             dir = direction.normalized; dir.z = 0f;
             transform.localScale = Vector3.one * radius * 2f;
+            Speed = color == BubbleColor.Lightning ? 28f : (color == BubbleColor.Fireball ? 25f : 22f);
             var rend = GetComponent<Renderer>();
             rend.sharedMaterial = BubblePalette.CreateMaterial(color);
         }
@@ -34,7 +37,6 @@ namespace BubbleShooter
         {
             if (done) return;
             float step = Speed * Time.deltaTime;
-            // sub-step so fast shots can't tunnel through bubbles
             while (step > 0f && !done)
             {
                 float s = Mathf.Min(step, radius * 0.4f);
@@ -47,7 +49,7 @@ namespace BubbleShooter
         {
             Vector3 p = transform.position + dir * s;
 
-            // wall bounce
+            // Side wall bounce
             float lim = (dir.x < 0 ? board.LeftWallX : board.RightWallX) + (dir.x < 0 ? radius : -radius);
             if ((dir.x < 0 && p.x <= lim) || (dir.x > 0 && p.x >= lim))
             {
@@ -55,7 +57,33 @@ namespace BubbleShooter
                 dir.x = -dir.x;
             }
 
-            // ceiling attach
+            // Fireball: pierce through bubbles
+            if (Color == BubbleColor.Fireball)
+            {
+                foreach (var b in board.AllBubbles())
+                {
+                    if (b == null || b.IsPopping || piercedBubbles.Contains(b)) continue;
+                    if ((p - b.transform.position).sqrMagnitude <= (radius * 2f * 0.95f) * (radius * 2f * 0.95f))
+                    {
+                        piercedBubbles.Add(b);
+                        GameManager.I.OnFireballHitBubble(b);
+                    }
+                }
+
+                if (p.y >= board.TopY - radius * 0.2f)
+                {
+                    transform.position = p;
+                    done = true;
+                    GameManager.I.OnFireballComplete(p);
+                    Destroy(gameObject, 0.05f);
+                    return;
+                }
+
+                transform.position = p;
+                return;
+            }
+
+            // Ceiling attach
             if (p.y >= board.TopY - radius * 0.2f)
             {
                 transform.position = p;
@@ -63,7 +91,7 @@ namespace BubbleShooter
                 return;
             }
 
-            // bubble collision
+            // Normal bubble collision
             foreach (var b in board.AllBubbles())
             {
                 if (b == null || b.IsPopping) continue;

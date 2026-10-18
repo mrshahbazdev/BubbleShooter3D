@@ -69,6 +69,18 @@ namespace BubbleShooter
             return list;
         }
 
+        /// <summary>All bubbles across an entire row (lightning power-up).</summary>
+        public static List<Vector2Int> GetRow(BubbleBoard board, int r)
+        {
+            var list = new List<Vector2Int>();
+            if (r < 0 || r >= board.RowCount) return list;
+            for (int c = 0; c < board.ColsInRow(r); c++)
+            {
+                if (board.Get(r, c) != null) list.Add(new Vector2Int(r, c));
+            }
+            return list;
+        }
+
         /// <summary>Bubbles not connected to the top row — these drop.</summary>
         public static List<Vector2Int> GetFloating(BubbleBoard board)
         {

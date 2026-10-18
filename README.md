@@ -1,53 +1,54 @@
-# Bubble Shooter 3D
+# Bubble Shooter 3D (Enhanced & Advanced Edition)
 
-A complete 3D bubble shooter built with **Unity 2022.3 LTS + C#** — no external assets needed, everything (models, materials, UI, sounds, particles) is generated procedurally at runtime.
+An advanced, arcade-grade 3D bubble shooter built with **Unity 6 / Unity 2022.3 LTS + C#** — zero external assets required. Everything (models, materials, shaders, UI, audio, music, particle systems) is procedurally generated at runtime.
 
-## Features
+## Advanced Features
 
-- **Full 3D gameplay** — glossy emissive bubbles, soft shadows, neon rails, perspective camera
-- **Hex grid board** — staggered-row layout hanging from the ceiling
-- **Trajectory preview** — dotted aim line with wall-bounce prediction (up to 3 bounces)
-- **Match-3 popping** — flood-fill cluster detection with combo multipliers
-- **Floating drops** — detached clusters fall with real physics (Rigidbody + torque)
-- **Power-ups** — Bomb bubble [B] destroys a radius; Rainbow bubble matches any color
-- **Pressure mechanic** — new row pushes down after N missed shots (ramps with level)
-- **Infinite levels** — more rows and colors each level, win bonus, score/moves/combo HUD
-- **Synthesized SFX** — pop, shoot, bomb, drop, win/lose jingles generated in code
-- **Swap** — press X to swap current/next bubble
+- **Hologram Aim Ghost Prediction** — Displays an exact translucent ghost sphere at the grid cell where the projectile will snap before you fire.
+- **Full 3D Arcade Visuals & Juice**:
+  - Mechanical recoil on the cannon barrel with spring recovery.
+  - Dynamic point-light muzzle flash on firing.
+  - Hex grid neighbors jiggle and squash on bullet impact.
+  - Floating combo callouts (*"NICE!"*, *"GREAT!"*, *"AWESOME!"*, *"UNSTOPPABLE!"*).
+- **Expanded Special Power-Up Arsenal**:
+  - **Bomb Bubble [B] / UI Button**: Destroys all neighboring bubbles within a radius with a high-intensity shockwave and screen shake.
+  - **Fireball Bubble [F] / UI Button**: Blazes through obstacles, piercing and burning bubbles in its direct path all the way to the ceiling!
+  - **Lightning Zap [L] / UI Button**: High-speed electric bolt that zaps and wipes out an entire horizontal row of bubbles!
+  - **Rainbow Bubble**: Wildcard that adopts whatever neighboring color creates the largest match cluster.
+- **Audio Experience**:
+  - **Pentatonic Musical Pop Cascade**: Successive pops in a cluster pitch-shift upward along the musical scale (*C-D-E-G-A-C-D-E*), creating an immensely satisfying cascade.
+  - **Procedural Ambient BGM**: Relaxing, dreamy synthesized chord arpeggios looping in the background.
+  - Unique sound effects for Zap, Fireball, Bombs, and Combo chimes.
+- **On-Screen Interactive Power-Up Bar** — Clickable HUD buttons for touch and mouse gameplay with live inventory count badges and active glowing states.
+- **Performance & Progression**:
+  - **Ceiling Descent Warning**: Real-time counter and flashing warning indicator when a pressure descent is imminent.
+  - **High Score Tracking**: Automatically saved to `PlayerPrefs` and displayed on the HUD.
+  - **Star Rating System**: 1, 2, or 3 stars awarded based on efficiency and moves taken per level.
+  - **Pause & Settings Menu [ESC]**: In-game pause menu with Resume, Restart, and Audio Mute/Unmute toggle.
 
 ## Controls
 
-| Action | Input |
-|---|---|
-| Aim | Mouse |
-| Fire | Left click |
-| Swap bubble | X |
-| Bomb shot | B |
+| Action | Input | On-Screen Button |
+|---|---|---|
+| Aim | Mouse Movement | — |
+| Fire | Left Click | — |
+| Swap Bubble | **X** | **SWAP [X]** |
+| Bomb Shot | **B** | **BOMB [B]** |
+| Fireball Shot | **F** | **FIRE [F]** |
+| Lightning Zap | **L** | **ZAP [L]** |
+| Pause / Settings | **ESC** | **\|\|** (Top Right) |
 
-## How to run
+## How to Run
 
-1. Install **Unity Hub** and a supported editor — **Unity 6** (6000.x) or **Unity 2022.3 LTS up to 2022.3.62f1**.
-   - Note: 2022.3.63f1+ builds are *Extended LTS* and require an Enterprise/Industry license — they will not activate on a Personal license. Verified end-to-end on **Unity 6000.6.6f1** (compile + editor smoke tests).
-2. Unity Hub → **Open** → select this folder.
-3. Open `Assets/Scenes/Main.unity` and press **Play**.
+1. Open **Unity Hub**.
+2. Click **Add** / **Open** → select this cloned folder:
+   `C:\Users\mrsha\.gemini\antigravity\scratch\BubbleShooter3D`
+3. Select **Unity 6** (6000.6.6f1) or **Unity 2022.3 LTS**.
+4. In Project window, open `Assets/Scenes/Main.unity` and click **Play**!
 
-The scene contains a single `Bootstrap` object — `GameBootstrap.cs` builds the
-camera, lights, board, cannon, UI and audio at runtime, so no asset setup is
-needed.
+## Automated Verification
 
-## Structure
-
-```
-Assets/Scripts/
-  GameBootstrap.cs   — scene builder / entry point
-  BubbleBoard.cs     — hex grid model, snap logic, row pressure
-  Bubble.cs          — bubble visuals, pop/drop animations
-  MatchSolver.cs     — match-3 clusters, radius, floating detection
-  Projectile.cs      — fired bubble flight + analytic collision
-  Shooter.cs         — cannon, aim, trajectory line, reload/power-ups
-  GameManager.cs     — score, combos, levels, win/lose
-  UIManager.cs       — code-built uGUI HUD + win/lose panels
-  EffectsManager.cs  — particle bursts + bomb shockwave
-  AudioManager.cs    — procedurally generated sound effects
-  BubblePalette.cs   — colors + glossy materials
+Run headless tests via:
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\6000.6.6f1\Editor\Unity.exe" -batchmode -projectPath . -executeMethod BubbleShooter.EditorTools.EditorSmokeTests.RunAll -quit -logFile -
 ```

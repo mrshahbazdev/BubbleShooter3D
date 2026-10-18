@@ -64,7 +64,11 @@ namespace BubbleShooter
             rb.useGravity = true;
             rb.mass = 0.1f;
             rb.AddTorque(Random.insideUnitSphere * 5f, ForceMode.Impulse);
+#if UNITY_6000_0_OR_NEWER
+            rb.linearVelocity = new Vector3(Random.Range(-1.5f, 1.5f), 0.5f, Random.Range(-0.5f, 0.5f));
+#else
             rb.velocity = new Vector3(Random.Range(-1.5f, 1.5f), 0.5f, Random.Range(-0.5f, 0.5f));
+#endif
             yield return new WaitForSeconds(1.6f);
             Destroy(gameObject);
         }
