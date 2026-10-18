@@ -31,11 +31,20 @@ namespace BubbleShooter
             Speed = color == BubbleColor.Lightning ? 28f : (color == BubbleColor.Fireball ? 25f : 22f);
             var rend = GetComponent<Renderer>();
             rend.sharedMaterial = BubblePalette.CreateMaterial(color);
+            BubblePalette.AddGloss(gameObject, radius);
         }
+
+        float lifetime;
 
         void Update()
         {
             if (done) return;
+            lifetime += Time.deltaTime;
+            if (lifetime > 2.5f)
+            {
+                Snap(board.FindCeilingCell(transform.position), transform.position);
+                return;
+            }
             float step = Speed * Time.deltaTime;
             while (step > 0f && !done)
             {

@@ -21,11 +21,14 @@ namespace BubbleShooter
         Renderer rend;
         float rainbowPhase;
 
+        Vector3 baseScale;
+
         public void Init(BubbleColor color, int row, int col, float radius)
         {
             Color = color; Row = row; Col = col;
             name = $"Bubble_{color}_{row}_{col}";
-            transform.localScale = Vector3.one * radius * 2f;
+            baseScale = Vector3.one * radius * 2f;
+            transform.localScale = baseScale;
             rend = GetComponent<Renderer>();
             rainbowPhase = Random.value * 6f;
             rend.sharedMaterial = BubblePalette.CreateMaterial(color);
@@ -41,6 +44,13 @@ namespace BubbleShooter
                 int j = (i + 1) % rainbowStops.Length;
                 rend.material.color = UnityEngine.Color.Lerp(rainbowStops[i], rainbowStops[j], rainbowPhase % 1f);
             }
+
+            if (!IsPopping)
+            {
+                // Organic 3D breathing pulse so the bubbles feel alive and glossy
+                float breath = 1f + 0.015f * Mathf.Sin(Time.time * 2.2f + Row * 0.6f + Col * 0.4f);
+                transform.localScale = baseScale * breath;
+            }
         }
 
         public IEnumerator PopAnim(float delay)
@@ -49,10 +59,11 @@ namespace BubbleShooter
             yield return new WaitForSeconds(delay);
             float t = 0f;
             Vector3 s = transform.localScale;
-            while (t < 0.18f)
+            while (t < 0.16f)
             {
                 t += Time.deltaTime;
-                transform.localScale = s * (1f + t * 4f); // grow then vanish
+                float p = t / 0.16f;
+                transform.localScale = s * (1f + p * 3.5f);
                 yield return null;
             }
             Destroy(gameObject);
@@ -62,14 +73,15 @@ namespace BubbleShooter
         {
             var rb = gameObject.AddComponent<Rigidbody>();
             rb.useGravity = true;
-            rb.mass = 0.1f;
-            rb.AddTorque(Random.insideUnitSphere * 5f, ForceMode.Impulse);
+            rb.mass = 0.12f;
+            rb.AddTorque(Random.insideUnitSphere * 6f, ForceMode.Impulse);
 #if UNITY_6000_0_OR_NEWER
-            rb.linearVelocity = new Vector3(Random.Range(-1.5f, 1.5f), 0.5f, Random.Range(-0.5f, 0.5f));
+            rb.linearVelocity = new Vector3(Random.Range(-2f, 2f), Random.Range(1f, 3f), Random.Range(-0.8f, 0.8f));
 #else
-            rb.velocity = new Vector3(Random.Range(-1.5f, 1.5f), 0.5f, Random.Range(-0.5f, 0.5f));
+            rb.velocity = new Vector3(Random.Range(-2f, 2f), Random.Range(1f, 3f), Random.Range(-0.8f, 0.8f));
 #endif
-            yield return new WaitForSeconds(1.6f);
+            yield return new WaitForSeconds(1.2f);
+            if (EffectsManager.I != null) EffectsManager.I.Burst(transform.position, Color);
             Destroy(gameObject);
         }
     }

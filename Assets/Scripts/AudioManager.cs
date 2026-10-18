@@ -33,14 +33,14 @@ namespace BubbleShooter
             float[] popFreqs = { 523.25f, 587.33f, 659.25f, 783.99f, 880.00f, 1046.50f, 1174.66f, 1318.51f };
             for (int i = 0; i < popFreqs.Length; i++)
             {
-                popScale.Add(Tone(popFreqs[i], 0.08f, "sine", 0.5f, decay: 9f));
+                popScale.Add(Tone(popFreqs[i], 0.11f, "sine", 0.65f, decay: 11f));
             }
 
-            clips["pop"] = popScale[4]; // Default 880Hz pop
-            clips["shoot"] = Tone(440f, 0.08f, "triangle", 0.35f, decay: 6f);
-            clips["bomb"] = Tone(110f, 0.38f, "noise", 0.75f, decay: 2.8f);
-            clips["zap"] = SweepTone(880f, 180f, 0.22f, "saw", 0.5f);
-            clips["fire"] = Tone(140f, 0.28f, "noise", 0.65f, decay: 3.5f);
+            clips["pop"] = popScale[4]; // Default pop
+            clips["shoot"] = SweepTone(340f, 120f, 0.10f, "sine", 0.65f);
+            clips["bomb"] = Tone(95f, 0.42f, "noise", 0.85f, decay: 2.5f);
+            clips["zap"] = SweepTone(980f, 160f, 0.24f, "saw", 0.55f);
+            clips["fire"] = Tone(130f, 0.32f, "noise", 0.7f, decay: 3.2f);
             clips["drop"] = Tone(330f, 0.12f, "sine", 0.4f, decay: 4f);
             clips["descend"] = Tone(196f, 0.18f, "square", 0.3f, decay: 5f);
             clips["combo"] = Arpeggio(new[] { 587f, 740f, 880f, 1174f }, 0.08f);

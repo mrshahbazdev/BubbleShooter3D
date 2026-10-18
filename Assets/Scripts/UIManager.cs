@@ -63,6 +63,7 @@ namespace BubbleShooter
             t.font = font; t.text = content; t.fontSize = size;
             t.alignment = anchor; t.color = Color.white;
             t.supportRichText = true;
+            t.raycastTarget = false;
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = anchorPoint;
             rt.anchorMax = anchorPoint;
@@ -92,6 +93,7 @@ namespace BubbleShooter
             go.transform.SetParent(parent, false);
             var img = go.AddComponent<Image>();
             img.color = bgColor;
+            img.raycastTarget = true;
             var btn = go.AddComponent<Button>();
             var rt = go.GetComponent<RectTransform>();
             rt.sizeDelta = size; rt.anchoredPosition = pos;
@@ -108,6 +110,7 @@ namespace BubbleShooter
             go.transform.SetParent(parent, false);
             var img = go.AddComponent<Image>();
             img.color = tint;
+            img.raycastTarget = false;
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = anchorPoint; rt.anchorMax = anchorPoint; rt.pivot = anchorPoint;
             rt.sizeDelta = size; rt.anchoredPosition = pos;
@@ -276,12 +279,15 @@ namespace BubbleShooter
             if (dropped > 0) comboText.text += $"  +{dropped} DROPPED!";
         }
 
-        public void ShowLevelBanner(int level)
+        public void ShowLevelBanner(string text)
         {
-            bannerText.text = $"LEVEL {level}";
+            bannerText.text = text;
             CancelInvoke();
-            Invoke(nameof(ClearBanner), 1.6f);
+            Invoke(nameof(ClearBanner), 1.8f);
         }
+
+        public void ShowLevelBanner(int level) => ShowLevelBanner($"LEVEL {level}");
+
         void ClearBanner() => bannerText.text = "";
 
         public void ShowPause(bool paused)

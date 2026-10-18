@@ -220,17 +220,46 @@ namespace BubbleShooter
             t.position = target;
         }
 
-        public void SeedRows(int rowCount, int colorCount)
+        public void SeedRows(int rowCount, int colorCount, int level = 1)
         {
-            var colors = RemainingPlayableColors();
+            int pattern = level % 4;
+
             for (int r = 0; r < rowCount; r++)
             {
                 EnsureRow();
-                for (int c = 0; c < ColsInRow(r); c++)
+                int cols = ColsInRow(r);
+                for (int c = 0; c < cols; c++)
                 {
-                    // sprinkle some gaps in lower rows
-                    if (r > 3 && Random.value < 0.12f) continue;
-                    var col = (BubbleColor)Random.Range(0, colorCount);
+                    // Level architectures for variation across unlimited levels
+                    if (pattern == 1 && r >= 3)
+                    {
+                        // Inverted wedge / diamond gaps
+                        int distFromCenter = Mathf.Abs(c - cols / 2);
+                        if (distFromCenter > (rowCount - r) + 1) continue;
+                    }
+                    else if (pattern == 2)
+                    {
+                        // Staggered columns with strategic gaps
+                        if (r > 2 && (c % 3 == 0) && r % 2 == 1) continue;
+                    }
+                    else if (r > 3 && Random.value < 0.08f)
+                    {
+                        continue;
+                    }
+
+                    // Cluster generation: 50% chance to inherit color from adjacent neighbor
+                    // This generates natural match-3 setups that make real commercial bubble shooters so fun!
+                    BubbleColor col;
+                    Bubble topNb = r > 0 ? Get(r - 1, Mathf.Clamp(c, 0, ColsInRow(r - 1) - 1)) : null;
+                    Bubble leftNb = c > 0 ? Get(r, c - 1) : null;
+
+                    if (leftNb != null && Random.value < 0.48f)
+                        col = leftNb.Color;
+                    else if (topNb != null && Random.value < 0.48f)
+                        col = topNb.Color;
+                    else
+                        col = (BubbleColor)Random.Range(0, colorCount);
+
                     PlaceBubble(col, r, c);
                 }
             }

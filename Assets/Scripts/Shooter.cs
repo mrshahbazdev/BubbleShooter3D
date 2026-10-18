@@ -50,6 +50,18 @@ namespace BubbleShooter
             barrel.transform.SetParent(transform, false);
             barrel.transform.localPosition = Vector3.zero;
 
+            // central glowing power core
+            var core = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            core.name = "PowerCore";
+            Destroy(core.GetComponent<Collider>());
+            core.transform.SetParent(barrel.transform, false);
+            core.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+            core.transform.localScale = Vector3.one * 0.75f;
+            var corm = core.GetComponent<Renderer>().material;
+            corm.color = new Color(0.15f, 0.75f, 1f);
+            corm.EnableKeyword("_EMISSION");
+            corm.SetColor("_EmissionColor", new Color(0.2f, 0.7f, 1f));
+
             var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             shaft.name = "Shaft";
             Destroy(shaft.GetComponent<Collider>());
@@ -59,6 +71,18 @@ namespace BubbleShooter
             var sm = shaft.GetComponent<Renderer>().material;
             sm.color = new Color(0.22f, 0.24f, 0.30f);
             sm.SetFloat("_Glossiness", 0.8f);
+
+            // glowing mid-barrel energy coil
+            var coil = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            coil.name = "EnergyCoil";
+            Destroy(coil.GetComponent<Collider>());
+            coil.transform.SetParent(barrel.transform, false);
+            coil.transform.localPosition = new Vector3(0f, 0.48f, 0f);
+            coil.transform.localScale = new Vector3(0.58f, 0.06f, 0.58f);
+            var cm = coil.GetComponent<Renderer>().material;
+            cm.color = new Color(0.2f, 0.9f, 1f);
+            cm.EnableKeyword("_EMISSION");
+            cm.SetColor("_EmissionColor", new Color(0.15f, 0.65f, 0.95f));
 
             // glowing muzzle ring
             var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -231,10 +255,26 @@ namespace BubbleShooter
 
             DrawTrajectoryAndGhost(muzzle, d);
 
-            bool isOverUI = UnityEngine.EventSystems.EventSystem.current != null &&
-                            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+            bool isOverButton = false;
+            if (UnityEngine.EventSystems.EventSystem.current != null)
+            {
+                var eventData = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current)
+                {
+                    position = Input.mousePosition
+                };
+                var results = new List<UnityEngine.EventSystems.RaycastResult>();
+                UnityEngine.EventSystems.EventSystem.current.RaycastAll(eventData, results);
+                for (int i = 0; i < results.Count; i++)
+                {
+                    if (results[i].gameObject.GetComponentInParent<UnityEngine.UI.Button>() != null)
+                    {
+                        isOverButton = true;
+                        break;
+                    }
+                }
+            }
 
-            if (Input.GetMouseButtonDown(0) && !isOverUI) Fire(d);
+            if (Input.GetMouseButtonDown(0) && !isOverButton) Fire(d);
             if (Input.GetKeyDown(KeyCode.X)) Swap();
             if (Input.GetKeyDown(KeyCode.B)) ToggleBomb();
             if (Input.GetKeyDown(KeyCode.F)) ToggleFireball();
