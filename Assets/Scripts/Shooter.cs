@@ -198,7 +198,19 @@ namespace BubbleShooter
 
         Vector3 AimDir()
         {
-            Vector3 world = cam.ScreenToWorldPoint(Input.mousePosition);
+            if (cam == null) return Vector3.up;
+            Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+            Plane plane = new Plane(Vector3.forward, Vector3.zero);
+            Vector3 world;
+            if (plane.Raycast(ray, out float enter))
+            {
+                world = ray.GetPoint(enter);
+            }
+            else
+            {
+                world = cam.transform.position + ray.direction * 16f;
+            }
+
             Vector3 d = new Vector3(world.x - transform.position.x, world.y - transform.position.y, 0f);
             if (d.y < 0.15f) d = new Vector3(d.x, 0.15f, 0f);
             return d.normalized;
@@ -219,7 +231,10 @@ namespace BubbleShooter
 
             DrawTrajectoryAndGhost(muzzle, d);
 
-            if (Input.GetMouseButtonDown(0)) Fire(d);
+            bool isOverUI = UnityEngine.EventSystems.EventSystem.current != null &&
+                            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+
+            if (Input.GetMouseButtonDown(0) && !isOverUI) Fire(d);
             if (Input.GetKeyDown(KeyCode.X)) Swap();
             if (Input.GetKeyDown(KeyCode.B)) ToggleBomb();
             if (Input.GetKeyDown(KeyCode.F)) ToggleFireball();
@@ -259,7 +274,7 @@ namespace BubbleShooter
                             (next - b.transform.position).sqrMagnitude <= (Radius * 2f * 0.95f) * (Radius * 2f * 0.95f))
                         {
                             hit = true;
-                            predictedCell = board.FindSnapCell(b.transform.position);
+                            predictedCell = board.FindSnapCell(next);
                             break;
                         }
                     }

@@ -72,21 +72,30 @@ namespace BubbleShooter
             }
         }
 
-        /// <summary>All empty cells adjacent to the bubble cluster + ceiling cells.</summary>
+        /// <summary>All empty cells adjacent to any bubble on the board + empty ceiling cells.</summary>
         public List<Vector2Int> EmptyCellsNear(Vector3 point)
         {
             var set = new HashSet<Vector2Int>();
-            for (int r = 0; r < rows.Count; r++)
-                for (int c = 0; c < ColsInRow(r); c++)
-                    if (rows[r][c] == null)
-                        foreach (var n in Neighbors(r, c))
-                            if (Get(n.x, n.y) != null)
-                                set.Add(new Vector2Int(r, c));
+            foreach (var b in AllBubbles())
+            {
+                bool odd = (b.Row % 2) == 1;
+                int[] dc = odd ? new[] { -1, 1, 0, 1, 0, 1 } : new[] { -1, 1, -1, 0, -1, 0 };
+                int[] dr = { 0, 0, -1, -1, 1, 1 };
+                for (int i = 0; i < 6; i++)
+                {
+                    int nr = b.Row + dr[i], nc = b.Col + dc[i];
+                    if (nr >= 0 && nr < MaxRows && nc >= 0 && nc < ColsInRow(nr))
+                    {
+                        if (Get(nr, nc) == null)
+                            set.Add(new Vector2Int(nr, nc));
+                    }
+                }
+            }
             // also allow attaching to an empty top row
-            if (rows.Count > 0)
-                for (int c = 0; c < ColsInRow(0); c++)
-                    if (rows[0][c] == null)
-                        set.Add(new Vector2Int(0, c));
+            for (int c = 0; c < ColsInRow(0); c++)
+                if (Get(0, c) == null)
+                    set.Add(new Vector2Int(0, c));
+
             var list = new List<Vector2Int>(set);
             list.Sort((a, b) =>
                 Vector3.Distance(CellToWorld(a.x, a.y), point)

@@ -98,7 +98,7 @@ namespace BubbleShooter
                 if ((p - b.transform.position).sqrMagnitude <= (radius * 2f * 0.95f) * (radius * 2f * 0.95f))
                 {
                     transform.position = p;
-                    Snap(board.FindSnapCell(b.transform.position), p);
+                    Snap(board.FindSnapCell(p), p);
                     return;
                 }
             }
