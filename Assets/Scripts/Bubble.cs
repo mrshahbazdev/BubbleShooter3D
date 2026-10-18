@@ -32,7 +32,7 @@ namespace BubbleShooter
             rend = GetComponent<Renderer>();
             rainbowPhase = Random.value * 6f;
             rend.sharedMaterial = BubblePalette.CreateMaterial(color);
-            BubblePalette.AddGloss(gameObject, radius);
+            BubblePalette.Add3DOrnaments(gameObject, radius, color);
         }
 
         void Update()
@@ -69,18 +69,55 @@ namespace BubbleShooter
             Destroy(gameObject);
         }
 
-        public IEnumerator DropAnim()
+        public IEnumerator DropAnim(float delay = 0f, int dropIndex = 0)
         {
+            if (delay > 0f) yield return new WaitForSeconds(delay);
+
             var rb = gameObject.AddComponent<Rigidbody>();
             rb.useGravity = true;
-            rb.mass = 0.12f;
-            rb.AddTorque(Random.insideUnitSphere * 6f, ForceMode.Impulse);
+            rb.mass = 0.14f;
+            rb.AddTorque(Random.insideUnitSphere * 20f, ForceMode.Impulse);
+
+            Vector3 popVel = new Vector3(
+                Random.Range(-2.4f, 2.4f),
+                Random.Range(1.8f, 3.4f),
+                Random.Range(-1.2f, 0.4f)
+            );
 #if UNITY_6000_0_OR_NEWER
-            rb.linearVelocity = new Vector3(Random.Range(-2f, 2f), Random.Range(1f, 3f), Random.Range(-0.8f, 0.8f));
+            rb.linearVelocity = popVel;
 #else
-            rb.velocity = new Vector3(Random.Range(-2f, 2f), Random.Range(1f, 3f), Random.Range(-0.8f, 0.8f));
+            rb.velocity = popVel;
 #endif
-            yield return new WaitForSeconds(1.2f);
+
+            float floorY = -4.9f;
+            float elapsed = 0f;
+            bool bounced = false;
+
+            while (elapsed < 1.35f)
+            {
+                elapsed += Time.deltaTime;
+                if (!bounced && transform.position.y <= floorY)
+                {
+                    bounced = true;
+                    if (EffectsManager.I != null)
+                    {
+                        EffectsManager.I.Burst(transform.position, Color);
+                        EffectsManager.I.FloorSplash(transform.position, Color);
+                    }
+                    if (AudioManager.I != null)
+                    {
+                        AudioManager.I.PlayDropBounce(dropIndex);
+                    }
+                    // Bouncy rebound upward with dampening
+#if UNITY_6000_0_OR_NEWER
+                    rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.5f, Random.Range(2.8f, 4.2f), rb.linearVelocity.z);
+#else
+                    rb.velocity = new Vector3(rb.velocity.x * 0.5f, Random.Range(2.8f, 4.2f), rb.velocity.z);
+#endif
+                }
+                yield return null;
+            }
+
             if (EffectsManager.I != null) EffectsManager.I.Burst(transform.position, Color);
             Destroy(gameObject);
         }

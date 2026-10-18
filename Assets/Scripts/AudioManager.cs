@@ -10,6 +10,7 @@ namespace BubbleShooter
 
         readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
         readonly List<AudioClip> popScale = new List<AudioClip>();
+        readonly List<AudioClip> dropBounces = new List<AudioClip>();
         AudioSource sfxSrc;
         AudioSource bgmSrc;
 
@@ -36,12 +37,20 @@ namespace BubbleShooter
                 popScale.Add(Tone(popFreqs[i], 0.11f, "sine", 0.65f, decay: 11f));
             }
 
+            // Bouncy cartoon plop tones for floor bounces
+            float[] bounceFreqs = { 440f, 392f, 349f, 329f, 293f, 261f, 220f, 196f };
+            for (int i = 0; i < bounceFreqs.Length; i++)
+            {
+                dropBounces.Add(SweepTone(bounceFreqs[i], bounceFreqs[i] * 0.45f, 0.085f, "sine", 0.65f));
+            }
+
             clips["pop"] = popScale[4]; // Default pop
             clips["shoot"] = SweepTone(340f, 120f, 0.10f, "sine", 0.65f);
             clips["bomb"] = Tone(95f, 0.42f, "noise", 0.85f, decay: 2.5f);
             clips["zap"] = SweepTone(980f, 160f, 0.24f, "saw", 0.55f);
             clips["fire"] = Tone(130f, 0.32f, "noise", 0.7f, decay: 3.2f);
             clips["drop"] = Tone(330f, 0.12f, "sine", 0.4f, decay: 4f);
+            clips["avalanche"] = Tone(68f, 0.55f, "sine", 0.9f, decay: 2.2f);
             clips["descend"] = Tone(196f, 0.18f, "square", 0.3f, decay: 5f);
             clips["combo"] = Arpeggio(new[] { 587f, 740f, 880f, 1174f }, 0.08f);
             clips["win"] = Arpeggio(new[] { 523f, 659f, 784f, 1046f }, 0.12f);
@@ -83,6 +92,35 @@ namespace BubbleShooter
             if (IsMuted || sfxSrc == null || popScale.Count == 0) return;
             int idx = Mathf.Clamp(pitchIndex, 0, popScale.Count - 1);
             sfxSrc.PlayOneShot(popScale[idx]);
+        }
+
+        /// <summary>Plays a bouncy cartoon pop when a falling bubble bounces on the floor.</summary>
+        public void PlayDropBounce(int index = 0)
+        {
+            if (IsMuted || sfxSrc == null || dropBounces.Count == 0) return;
+            int idx = Mathf.Clamp(index, 0, dropBounces.Count - 1);
+            sfxSrc.PlayOneShot(dropBounces[idx], 0.75f);
+        }
+
+        /// <summary>Cascading musical chimes when bulk bubbles drop together.</summary>
+        public void PlayDropCascade(int count)
+        {
+            if (IsMuted || sfxSrc == null) return;
+            StartCoroutine(CoDropCascade(count));
+        }
+
+        System.Collections.IEnumerator CoDropCascade(int count)
+        {
+            int notes = Mathf.Clamp(count, 2, 8);
+            float[] freqs = { 261.63f, 329.63f, 392.00f, 523.25f, 659.25f, 783.99f, 1046.50f, 1318.51f };
+            for (int i = 0; i < notes; i++)
+            {
+                if (sfxSrc != null && !IsMuted)
+                {
+                    sfxSrc.PlayOneShot(Tone(freqs[i], 0.12f, "triangle", 0.5f, decay: 7f));
+                }
+                yield return new WaitForSeconds(0.04f);
+            }
         }
 
         static AudioClip Tone(float freq, float dur, string wave, float vol, float decay)

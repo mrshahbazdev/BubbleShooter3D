@@ -24,6 +24,11 @@ namespace BubbleShooter
         Camera cam;
         Vector3 muzzle => barrel.transform.position + barrel.transform.up * 0.9f;
 
+        const int MAX_TRAJECTORY_DOTS = 70;
+        GameObject[] trajDots;
+        Material trajDotMat;
+        GameObject trajDotsRoot;
+
         public BubbleColor Current { get; private set; }
         public BubbleColor Next { get; private set; }
         public PowerupType ActivePowerup { get; private set; } = PowerupType.None;
@@ -119,6 +124,26 @@ namespace BubbleShooter
             line.numCornerVertices = 4;
             line.numCapVertices = 4;
 
+            // animated trajectory dots pool
+            trajDotsRoot = new GameObject("TrajectoryDots");
+            trajDotsRoot.transform.SetParent(transform, false);
+            trajDots = new GameObject[MAX_TRAJECTORY_DOTS];
+            trajDotMat = new Material(Shader.Find("Standard"));
+            trajDotMat.SetFloat("_Glossiness", 0.95f);
+            trajDotMat.EnableKeyword("_EMISSION");
+
+            for (int i = 0; i < MAX_TRAJECTORY_DOTS; i++)
+            {
+                var dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                dot.name = "TrajDot_" + i;
+                Destroy(dot.GetComponent<Collider>());
+                dot.transform.SetParent(trajDotsRoot.transform, false);
+                dot.transform.localScale = Vector3.one * 0.14f;
+                dot.GetComponent<Renderer>().sharedMaterial = trajDotMat;
+                dot.SetActive(false);
+                trajDots[i] = dot;
+            }
+
             // ghost aim indicator (predicted landing bubble)
             ghostGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             ghostGo.name = "AimGhost";
@@ -135,8 +160,8 @@ namespace BubbleShooter
             nextGo.transform.SetParent(transform, false);
             nextGo.transform.localPosition = new Vector3(1.6f, 0.35f, 0f);
             nextGo.transform.localScale = Vector3.one * Radius * 1.4f;
-            BubblePalette.AddGloss(currentGo, Radius);
-            BubblePalette.AddGloss(nextGo, Radius);
+            BubblePalette.Add3DOrnaments(currentGo, Radius, Current);
+            BubblePalette.Add3DOrnaments(nextGo, Radius, Next);
 
             Reload(first: true);
         }
@@ -161,7 +186,7 @@ namespace BubbleShooter
             currentGo.transform.position = muzzle;
             currentGo.transform.localScale = Vector3.one * Radius * 2f;
             UpdateCurrentMaterial();
-            nextGo.GetComponent<Renderer>().sharedMaterial = BubblePalette.CreateMaterial(Next);
+            UpdateNextMaterial();
             if (UIManager.I != null) UIManager.I.SetHud();
         }
 
@@ -169,6 +194,25 @@ namespace BubbleShooter
         {
             BubbleColor c = GetActiveColor();
             currentGo.GetComponent<Renderer>().sharedMaterial = BubblePalette.CreateMaterial(c);
+            var core = currentGo.transform.Find("InnerCore");
+            if (core != null)
+            {
+                var cm = core.GetComponent<Renderer>().material;
+                cm.color = BubblePalette.Colors[(int)c];
+                cm.SetColor("_EmissionColor", BubblePalette.Colors[(int)c] * 0.7f);
+            }
+        }
+
+        void UpdateNextMaterial()
+        {
+            nextGo.GetComponent<Renderer>().sharedMaterial = BubblePalette.CreateMaterial(Next);
+            var nextCore = nextGo.transform.Find("InnerCore");
+            if (nextCore != null)
+            {
+                var nm = nextCore.GetComponent<Renderer>().material;
+                nm.color = BubblePalette.Colors[(int)Next];
+                nm.SetColor("_EmissionColor", BubblePalette.Colors[(int)Next] * 0.7f);
+            }
         }
 
         public BubbleColor GetActiveColor()
@@ -188,7 +232,7 @@ namespace BubbleShooter
             (Current, Next) = (Next, Current);
             ActivePowerup = PowerupType.None;
             UpdateCurrentMaterial();
-            nextGo.GetComponent<Renderer>().sharedMaterial = BubblePalette.CreateMaterial(Next);
+            UpdateNextMaterial();
             AudioManager.I.Play("click");
             if (UIManager.I != null) UIManager.I.SetHud();
         }
@@ -245,6 +289,7 @@ namespace BubbleShooter
             if (Busy || GameManager.I.State != GameState.Playing || GameManager.I.IsPaused)
             {
                 line.positionCount = 0;
+                HideTrajectoryDots();
                 if (ghostGo != null) ghostGo.SetActive(false);
                 return;
             }
@@ -323,8 +368,14 @@ namespace BubbleShooter
                 p = next;
             }
 
+            Color activeCol = BubblePalette.Colors[(int)GetActiveColor()];
+            line.startColor = new Color(activeCol.r, activeCol.g, activeCol.b, 0.22f);
+            line.endColor = new Color(activeCol.r, activeCol.g, activeCol.b, 0.05f);
+            line.startWidth = line.endWidth = 0.035f;
             line.positionCount = pts.Count;
             line.SetPositions(pts.ToArray());
+
+            DrawAnimatedDots(pts);
 
             // Update ghost bubble indicator
             if (predictedCell.HasValue && ActivePowerup != PowerupType.Fireball)
@@ -340,6 +391,79 @@ namespace BubbleShooter
             else
             {
                 ghostGo.SetActive(false);
+            }
+        }
+
+        void DrawAnimatedDots(List<Vector3> pts)
+        {
+            if (pts == null || pts.Count < 2 || trajDots == null)
+            {
+                HideTrajectoryDots();
+                return;
+            }
+
+            float totalDist = 0f;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                totalDist += Vector3.Distance(pts[i], pts[i + 1]);
+            }
+
+            float dotSpacing = 0.38f;
+            float animSpeed = 4.6f;
+            float animOffset = (Time.time * animSpeed) % dotSpacing;
+
+            Color activeCol = BubblePalette.Colors[(int)GetActiveColor()];
+            trajDotMat.color = activeCol;
+            trajDotMat.SetColor("_EmissionColor", activeCol * 0.95f);
+
+            int dotIdx = 0;
+            float currentDist = animOffset;
+
+            while (currentDist < totalDist && dotIdx < MAX_TRAJECTORY_DOTS)
+            {
+                Vector3 dotPos = SamplePolyline(pts, currentDist);
+                var dot = trajDots[dotIdx];
+                dot.transform.position = dotPos;
+
+                float progress = currentDist / Mathf.Max(0.01f, totalDist);
+                float pulse = 1f + 0.18f * Mathf.Sin(Time.time * 9f - dotIdx * 0.35f);
+                float sz = Mathf.Lerp(0.14f, 0.08f, progress) * pulse;
+                dot.transform.localScale = Vector3.one * sz;
+
+                if (!dot.activeSelf) dot.SetActive(true);
+                dotIdx++;
+                currentDist += dotSpacing;
+            }
+
+            for (int i = dotIdx; i < MAX_TRAJECTORY_DOTS; i++)
+            {
+                if (trajDots[i].activeSelf) trajDots[i].SetActive(false);
+            }
+        }
+
+        Vector3 SamplePolyline(List<Vector3> pts, float dist)
+        {
+            float accumulated = 0f;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                float segLen = Vector3.Distance(pts[i], pts[i + 1]);
+                if (accumulated + segLen >= dist)
+                {
+                    float segT = (dist - accumulated) / Mathf.Max(0.0001f, segLen);
+                    return Vector3.Lerp(pts[i], pts[i + 1], segT);
+                }
+                accumulated += segLen;
+            }
+            return pts[pts.Count - 1];
+        }
+
+        void HideTrajectoryDots()
+        {
+            if (trajDots == null) return;
+            for (int i = 0; i < trajDots.Length; i++)
+            {
+                if (trajDots[i] != null && trajDots[i].activeSelf)
+                    trajDots[i].SetActive(false);
             }
         }
 
@@ -373,6 +497,7 @@ namespace BubbleShooter
 
             currentGo.transform.localScale = Vector3.zero;
             line.positionCount = 0;
+            HideTrajectoryDots();
             if (ghostGo != null) ghostGo.SetActive(false);
 
             if (color == BubbleColor.Fireball)

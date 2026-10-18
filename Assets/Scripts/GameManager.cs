@@ -115,18 +115,27 @@ namespace BubbleShooter
 
         IEnumerator SlideIn(Bubble b, Vector3 target)
         {
+            if (b == null) yield break;
             float t = 0; Vector3 from = b.transform.position;
-            while (t < 0.12f) { t += Time.deltaTime; b.transform.position = Vector3.Lerp(from, target, t / 0.12f); yield return null; }
+            while (t < 0.12f)
+            {
+                if (b == null) yield break;
+                t += Time.deltaTime;
+                b.transform.position = Vector3.Lerp(from, target, t / 0.12f);
+                yield return null;
+            }
+            if (b == null) yield break;
             b.transform.position = target;
             Vector3 s = b.transform.localScale;
             float k = 0;
             while (k < 0.15f)
             {
+                if (b == null) yield break;
                 k += Time.deltaTime;
                 b.transform.localScale = s * (1f + 0.25f * Mathf.Sin(k / 0.15f * Mathf.PI));
                 yield return null;
             }
-            b.transform.localScale = s;
+            if (b != null) b.transform.localScale = s;
         }
 
         public void OnFireballHitBubble(Bubble b)
@@ -224,21 +233,47 @@ namespace BubbleShooter
 
                 yield return new WaitForSeconds(0.25f);
                 var floating = MatchSolver.GetFloating(Board);
+                int dropIdx = 0;
                 foreach (var cell in floating)
                 {
                     var bub = Board.Get(cell.x, cell.y);
                     if (bub == null) continue;
                     Board.Remove(cell.x, cell.y);
-                    StartCoroutine(bub.DropAnim());
+                    float stagger = (bub.Row * 0.035f) + (dropIdx * 0.02f);
+                    StartCoroutine(bub.DropAnim(stagger, dropIdx));
                     dropped++;
+                    dropIdx++;
                 }
+
                 if (dropped > 0)
                 {
-                    int dropPoints = dropped * 25;
+                    int dropPoints = dropped * 35;
                     Score += dropPoints;
                     UpdateHighScore();
-                    AudioManager.I.Play("drop");
-                    EffectsManager.I.Popup(new Vector3(0f, 0f, 0f), "+" + dropPoints + " DROPPED!", new Color(0.4f, 0.9f, 1f));
+
+                    if (dropped >= 8)
+                    {
+                        // Catastrophic Avalanche
+                        AudioManager.I.Play("avalanche");
+                        EffectsManager.I.Shake(0.45f);
+                        EffectsManager.I.MegaConfetti(new Vector3(0f, 1f, -1f));
+                        EffectsManager.I.Popup(new Vector3(0f, 1.2f, -1f), $"💥 MASSIVE AVALANCHE!\n+{dropPoints} PTS ({dropped} BUBBLES!)", new Color(1f, 0.85f, 0.15f));
+                    }
+                    else if (dropped >= 4)
+                    {
+                        // Mega Drop
+                        AudioManager.I.Play("avalanche");
+                        EffectsManager.I.Shake(0.28f);
+                        EffectsManager.I.MegaConfetti(new Vector3(0f, 1f, -1f));
+                        EffectsManager.I.Popup(new Vector3(0f, 1f, -1f), $"⭐ MEGA DROP! +{dropPoints} PTS", new Color(0.35f, 0.95f, 1f));
+                    }
+                    else
+                    {
+                        AudioManager.I.Play("drop");
+                        EffectsManager.I.Popup(new Vector3(0f, 0.5f, -1f), $"+{dropPoints} DROPPED!", new Color(0.4f, 0.9f, 1f));
+                    }
+
+                    AudioManager.I.PlayDropCascade(dropped);
                 }
                 shotsSinceDescend = 0;
             }

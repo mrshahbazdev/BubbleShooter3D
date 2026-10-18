@@ -153,6 +153,54 @@ namespace BubbleShooter
             Destroy(go, 1f);
         }
 
+        public void FloorSplash(Vector3 pos, BubbleColor color)
+        {
+            var go = new GameObject("FloorSplash");
+            go.transform.position = pos;
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.45f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 5.5f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
+            main.startColor = BubblePalette.Colors[(int)color];
+            main.maxParticles = 25;
+            main.gravityModifier = 0.8f;
+            var emission = ps.emission;
+            emission.rateOverTime = 0;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 18) });
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 35f;
+            shape.radius = 0.15f;
+            go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f); // Upward cone
+            var psr = go.GetComponent<ParticleSystemRenderer>();
+            psr.material = particleMat;
+            Destroy(go, 0.8f);
+        }
+
+        public void MegaConfetti(Vector3 pos)
+        {
+            var go = new GameObject("MegaConfetti");
+            go.transform.position = pos;
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(4f, 10f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.28f);
+            main.startColor = new Color(1f, 0.85f, 0.2f, 1f);
+            main.maxParticles = 80;
+            main.gravityModifier = 0.35f;
+            var emission = ps.emission;
+            emission.rateOverTime = 0;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 75) });
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Sphere;
+            shape.radius = 0.8f;
+            var psr = go.GetComponent<ParticleSystemRenderer>();
+            psr.material = particleMat;
+            Destroy(go, 1.8f);
+        }
+
         public void ShowComboCallout(int combo)
         {
             if (combo < 2) return;

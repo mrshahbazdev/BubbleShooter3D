@@ -210,14 +210,16 @@ namespace BubbleShooter
 
         IEnumerator MoveTo(Transform t, Vector3 target)
         {
+            if (t == null) yield break;
             float elapsed = 0f; Vector3 from = t.position;
             while (elapsed < 0.25f)
             {
+                if (t == null) yield break;
                 elapsed += Time.deltaTime;
                 t.position = Vector3.Lerp(from, target, elapsed / 0.25f);
                 yield return null;
             }
-            t.position = target;
+            if (t != null) t.position = target;
         }
 
         public void SeedRows(int rowCount, int colorCount, int level = 1)
