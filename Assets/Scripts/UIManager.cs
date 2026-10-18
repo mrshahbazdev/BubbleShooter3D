@@ -279,11 +279,13 @@ namespace BubbleShooter
             if (dropped > 0) comboText.text += $"  +{dropped} DROPPED!";
         }
 
-        public void ShowLevelBanner(string text)
+        public void ShowLevelBanner(string text, Color? accent = null)
         {
             bannerText.text = text;
+            if (accent.HasValue) bannerText.color = accent.Value;
+            else bannerText.color = new Color(0.4f, 0.9f, 1f);
             CancelInvoke();
-            Invoke(nameof(ClearBanner), 1.8f);
+            Invoke(nameof(ClearBanner), 2.2f);
         }
 
         public void ShowLevelBanner(int level) => ShowLevelBanner($"LEVEL {level}");

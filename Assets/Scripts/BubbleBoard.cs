@@ -260,11 +260,45 @@ namespace BubbleShooter
                     else if (topNb != null && Random.value < 0.48f)
                         col = topNb.Color;
                     else
-                        col = (BubbleColor)Random.Range(0, colorCount);
+                    {
+                        var pal = GetLevelPalette(level, colorCount);
+                        col = pal[Random.Range(0, pal.Length)];
+                    }
 
                     PlaceBubble(col, r, c);
                 }
             }
+        }
+
+        static readonly BubbleColor[][] themePalettes =
+        {
+            new[] { BubbleColor.Blue, BubbleColor.Purple, BubbleColor.Green, BubbleColor.Yellow },  // 1: Cyberpunk
+            new[] { BubbleColor.Red, BubbleColor.Orange, BubbleColor.Yellow, BubbleColor.Purple },   // 2: Magma
+            new[] { BubbleColor.Green, BubbleColor.Yellow, BubbleColor.Blue, BubbleColor.Orange },   // 3: Emerald
+            new[] { BubbleColor.Purple, BubbleColor.Blue, BubbleColor.Red, BubbleColor.Orange },     // 4: Amethyst
+            new[] { BubbleColor.Yellow, BubbleColor.Orange, BubbleColor.Red, BubbleColor.Green },   // 5: Solaris Gold
+            new[] { BubbleColor.Blue, BubbleColor.Green, BubbleColor.Purple, BubbleColor.Red },      // 6: Arctic Glacier
+            new[] { BubbleColor.Purple, BubbleColor.Red, BubbleColor.Orange, BubbleColor.Blue },    // 7: Retro Synthwave
+            new[] { BubbleColor.Blue, BubbleColor.Green, BubbleColor.Yellow, BubbleColor.Purple }   // 8: Deep Ocean
+        };
+
+        public static BubbleColor[] GetLevelPalette(int level, int count)
+        {
+            int themeIdx = (Mathf.Max(1, level) - 1) % themePalettes.Length;
+            var baseSet = themePalettes[themeIdx];
+            if (count <= baseSet.Length)
+            {
+                var subset = new BubbleColor[count];
+                System.Array.Copy(baseSet, subset, count);
+                return subset;
+            }
+            var list = new System.Collections.Generic.List<BubbleColor>(baseSet);
+            for (int i = 0; i < 6 && list.Count < count; i++)
+            {
+                var bc = (BubbleColor)i;
+                if (!list.Contains(bc)) list.Add(bc);
+            }
+            return list.ToArray();
         }
 
         public void JiggleNeighbors(int r, int c, Vector3 dir)

@@ -55,18 +55,8 @@ namespace BubbleShooter
             if (UIManager.I != null) UIManager.I.ShowPause(IsPaused);
         }
 
-        static readonly string[] themeNames = {
-            "SAPPHIRE REEF",
-            "NEON HORIZON",
-            "EMERALD CITADEL",
-            "AMETHYST VOID",
-            "SOLARIS FLARE",
-            "CYBER MATRIX",
-            "CRYSTAL CHASM",
-            "ASTRAL NEXUS"
-        };
-
-        public string CurrentThemeName => themeNames[(Level - 1) % themeNames.Length];
+        public string CurrentThemeName => ThemeManager.I != null ? ThemeManager.I.CurrentTheme.Name : "LEVEL " + Level;
+        public Color CurrentThemeAccent => ThemeManager.I != null ? ThemeManager.I.CurrentTheme.Accent : Color.white;
 
         public void StartLevel(int level)
         {
@@ -81,26 +71,15 @@ namespace BubbleShooter
             int colors = Mathf.Min(3 + level, 6);
             Board.TopY = 6.4f;
             Board.SeedRows(rows, colors, level);
-            ApplyLevelAtmosphere(level);
+            
+            if (ThemeManager.I != null)
+                ThemeManager.I.ApplyTheme(level, immediate: level == 1);
 
             if (UIManager.I != null)
             {
                 UIManager.I.SetHud();
-                UIManager.I.ShowLevelBanner($"LEVEL {level}\n{CurrentThemeName}");
+                UIManager.I.ShowLevelBanner($"LEVEL {level}\n{CurrentThemeName}", CurrentThemeAccent);
             }
-        }
-
-        void ApplyLevelAtmosphere(int level)
-        {
-            int t = (level - 1) % 4;
-            Color ambient = t switch
-            {
-                0 => new Color(0.14f, 0.22f, 0.38f),
-                1 => new Color(0.38f, 0.14f, 0.28f),
-                2 => new Color(0.12f, 0.34f, 0.24f),
-                _ => new Color(0.26f, 0.16f, 0.40f)
-            };
-            RenderSettings.ambientLight = ambient;
         }
 
         public void OnProjectileSnapped(Projectile p, Vector2Int cell, Vector3 contact)

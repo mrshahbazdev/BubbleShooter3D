@@ -37,15 +37,22 @@ namespace BubbleShooter
             RenderSettings.ambientLight = new Color(0.22f, 0.24f, 0.32f);
 
             // Accent point lights for depth (cyan left, magenta right)
-            foreach (var (x, c) in new[] { (-9f, new Color(0.1f, 0.7f, 1f)), (9f, new Color(0.9f, 0.2f, 0.7f)) })
-            {
-                var pl = new GameObject("AccentLight").AddComponent<Light>();
-                pl.type = LightType.Point;
-                pl.color = c;
-                pl.intensity = 1.6f;
-                pl.range = 14f;
-                pl.transform.position = new Vector3(x, 1f, -4f);
-            }
+            Light accLeft = null, accRight = null;
+            var acc1 = new GameObject("AccentLightLeft").AddComponent<Light>();
+            acc1.type = LightType.Point;
+            acc1.color = new Color(0.1f, 0.7f, 1f);
+            acc1.intensity = 1.6f;
+            acc1.range = 14f;
+            acc1.transform.position = new Vector3(-9f, 1f, -4f);
+            accLeft = acc1;
+
+            var acc2 = new GameObject("AccentLightRight").AddComponent<Light>();
+            acc2.type = LightType.Point;
+            acc2.color = new Color(0.9f, 0.2f, 0.7f);
+            acc2.intensity = 1.6f;
+            acc2.range = 14f;
+            acc2.transform.position = new Vector3(9f, 1f, -4f);
+            accRight = acc2;
 
             // Starfield behind the board
             var stars = new GameObject("Starfield");
@@ -87,7 +94,8 @@ namespace BubbleShooter
             fm.SetFloat("_Glossiness", 0.9f);
             fm.SetFloat("_Metallic", 0.6f);
 
-            // Side rails (visual walls the shots bounce off)
+            // Side rails & ceiling
+            var railMats = new System.Collections.Generic.List<Material>();
             var board = new GameObject("Board").AddComponent<BubbleBoard>();
             board.Init();
             foreach (float side in new[] { -1f, 1f })
@@ -102,6 +110,7 @@ namespace BubbleShooter
                 rm.color = new Color(0.15f, 0.55f, 0.9f);
                 rm.EnableKeyword("_EMISSION");
                 rm.SetColor("_EmissionColor", new Color(0.1f, 0.35f, 0.6f));
+                railMats.Add(rm);
             }
             // Ceiling bar
             var ceil = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -113,6 +122,7 @@ namespace BubbleShooter
             cm.color = new Color(0.15f, 0.55f, 0.9f);
             cm.EnableKeyword("_EMISSION");
             cm.SetColor("_EmissionColor", new Color(0.1f, 0.35f, 0.6f));
+            railMats.Add(cm);
 
             // Death line (subtle red glow)
             var dl = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -129,10 +139,12 @@ namespace BubbleShooter
             // Managers
             gameObject.AddComponent<AudioManager>();
             gameObject.AddComponent<EffectsManager>();
+            var tm = gameObject.AddComponent<ThemeManager>();
             gameObject.AddComponent<UIManager>();
             var gm = gameObject.AddComponent<GameManager>();
             var shooter = new GameObject("Shooter").AddComponent<Shooter>();
             shooter.Init(board, cam);
+            tm.Init(cam, key, fill, accLeft, accRight, backMat, fm, railMats, sps, shooter);
             gm.Init(board, shooter);
         }
 
