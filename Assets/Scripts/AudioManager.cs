@@ -59,6 +59,8 @@ namespace BubbleShooter
             clips["tick"] = Tone(180f, 0.04f, "triangle", 0.5f, decay: 15f);
             clips["podHit"] = Arpeggio(new[] { 523f, 659f, 784f }, 0.05f);
             clips["swap"] = SweepTone(260f, 520f, 0.08f, "sine", 0.4f);
+            clips["starPop"] = Tone(1174f, 0.18f, "sine", 0.6f, decay: 6f);
+            clips["whoosh"] = SweepTone(180f, 480f, 0.14f, "noise", 0.35f);
 
             // Generate relaxing procedural BGM
             bgmSrc.clip = GenerateAmbientBGM();
@@ -103,6 +105,15 @@ namespace BubbleShooter
             if (IsMuted || sfxSrc == null || dropBounces.Count == 0) return;
             int idx = Mathf.Clamp(index, 0, dropBounces.Count - 1);
             sfxSrc.PlayOneShot(dropBounces[idx], 0.75f);
+        }
+
+        /// <summary>Plays progressive musical bell chimes for 3-star victory reveal.</summary>
+        public void PlayStarChime(int starIndex)
+        {
+            if (IsMuted || sfxSrc == null) return;
+            float[] freqs = { 659.25f, 880.00f, 1318.51f }; // E5, A5, E6 triumphant chords
+            int idx = Mathf.Clamp(starIndex, 0, freqs.Length - 1);
+            sfxSrc.PlayOneShot(Tone(freqs[idx], 0.25f, "sine", 0.65f, decay: 4.5f));
         }
 
         /// <summary>Cascading musical chimes when bulk bubbles drop together.</summary>

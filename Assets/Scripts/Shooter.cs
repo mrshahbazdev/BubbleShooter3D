@@ -28,6 +28,8 @@ namespace BubbleShooter
         GameObject[] trajDots;
         Material trajDotMat;
         GameObject trajDotsRoot;
+        GameObject reticleRing;
+        Material reticleMat;
 
         public BubbleColor Current { get; private set; }
         public BubbleColor Next { get; private set; }
@@ -150,6 +152,32 @@ namespace BubbleShooter
             Destroy(ghostGo.GetComponent<Collider>());
             ghostGo.transform.localScale = Vector3.one * Radius * 1.95f;
             ghostGo.SetActive(false);
+
+            // Holographic rotating target reticle attached to ghost
+            reticleRing = new GameObject("ReticleRing");
+            reticleRing.transform.SetParent(ghostGo.transform, false);
+            reticleMat = new Material(Shader.Find("Standard"));
+            reticleMat.SetFloat("_Glossiness", 0.95f);
+            reticleMat.EnableKeyword("_EMISSION");
+
+            var rRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(rRing.GetComponent<Collider>());
+            rRing.transform.SetParent(reticleRing.transform, false);
+            rRing.transform.localScale = new Vector3(1.35f, 0.02f, 1.35f);
+            rRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            rRing.GetComponent<Renderer>().sharedMaterial = reticleMat;
+
+            for (int i = 0; i < 4; i++)
+            {
+                var tick = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Destroy(tick.GetComponent<Collider>());
+                tick.transform.SetParent(reticleRing.transform, false);
+                float angle = i * 90f * Mathf.Deg2Rad;
+                tick.transform.localPosition = new Vector3(Mathf.Cos(angle) * 0.72f, Mathf.Sin(angle) * 0.72f, 0f);
+                tick.transform.localRotation = Quaternion.Euler(0f, 0f, i * 90f);
+                tick.transform.localScale = new Vector3(0.06f, 0.22f, 0.06f);
+                tick.GetComponent<Renderer>().sharedMaterial = reticleMat;
+            }
 
             // current / next bubble visual holders
             currentGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -389,8 +417,16 @@ namespace BubbleShooter
                 ghostGo.transform.position = ghostPos;
                 float pulse = 1f + 0.08f * Mathf.Sin(Time.time * 8f);
                 ghostGo.transform.localScale = Vector3.one * Radius * 1.9f * pulse;
+                Color activeCol = BubblePalette.Colors[(int)GetActiveColor()];
                 ghostGo.GetComponent<Renderer>().sharedMaterial =
                     BubblePalette.CreateGhostMaterial(GetActiveColor());
+
+                if (reticleRing != null)
+                {
+                    reticleRing.transform.Rotate(Vector3.forward, 65f * Time.deltaTime, Space.Self);
+                    reticleMat.color = activeCol;
+                    reticleMat.SetColor("_EmissionColor", activeCol * 0.95f);
+                }
             }
             else
             {

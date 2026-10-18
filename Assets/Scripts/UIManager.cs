@@ -1,23 +1,136 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace BubbleShooter
 {
     /// <summary>
-    /// Rich procedural HUD, on-screen power-up controls, pause menu, and animated victory panels.
+    /// Generates crisp procedural 9-sliced rounded rectangles at runtime with zero assets.
+    /// </summary>
+    public static class UISpriteFactory
+    {
+        static Sprite cardSprite;
+        static Sprite pillSprite;
+        static Sprite buttonSprite;
+        static Sprite glowFrameSprite;
+        static Sprite circleSprite;
+
+        public static Sprite GetCardSprite() =>
+            cardSprite ??= CreateRoundedRect(64, 64, 16, new Color(0.06f, 0.08f, 0.14f, 0.92f), new Color(0.25f, 0.55f, 0.85f, 0.55f), 2);
+
+        public static Sprite GetPillSprite() =>
+            pillSprite ??= CreateRoundedRect(64, 32, 16, new Color(0.04f, 0.06f, 0.10f, 0.88f), new Color(0.35f, 0.75f, 1f, 0.45f), 1);
+
+        public static Sprite GetButtonSprite() =>
+            buttonSprite ??= CreateRoundedRect(64, 64, 16, Color.white, new Color(1f, 1f, 1f, 0.35f), 2);
+
+        public static Sprite GetGlowFrameSprite() =>
+            glowFrameSprite ??= CreateRoundedRect(64, 64, 16, new Color(1f, 1f, 1f, 0.08f), Color.white, 3);
+
+        public static Sprite GetCircleSprite() =>
+            circleSprite ??= CreateRoundedRect(64, 64, 31, Color.white, new Color(1f, 1f, 1f, 0.35f), 2);
+
+        public static Sprite CreateRoundedRect(int width, int height, int radius, Color fill, Color border, int borderWidth = 0)
+        {
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float r = radius;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float dx = (x < r) ? r - x : (x > width - 1 - r) ? x - (width - 1 - r) : 0f;
+                    float dy = (y < r) ? r - y : (y > height - 1 - r) ? y - (height - 1 - r) : 0f;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    float alpha = Mathf.Clamp01(r - dist + 0.5f);
+                    if (alpha <= 0f)
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                    else
+                    {
+                        bool isBorder = borderWidth > 0 && (dist >= r - borderWidth || x < borderWidth || x >= width - borderWidth || y < borderWidth || y >= height - borderWidth);
+                        Color c = isBorder ? border : fill;
+                        c.a *= alpha;
+                        tex.SetPixel(x, y, c);
+                    }
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        }
+    }
+
+    /// <summary>
+    /// Tactile physical micro-interactions: squash on click, expand on hover, audio tick feedback.
+    /// </summary>
+    public class UIButtonFeedback : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+    {
+        Vector3 baseScale = Vector3.one;
+        Coroutine animRoutine;
+
+        void Awake() => baseScale = transform.localScale;
+
+        public void OnPointerEnter(PointerEventData e)
+        {
+            AnimateScale(baseScale * 1.06f);
+            if (AudioManager.I != null) AudioManager.I.Play("tick");
+        }
+
+        public void OnPointerExit(PointerEventData e) => AnimateScale(baseScale);
+
+        public void OnPointerDown(PointerEventData e) => AnimateScale(baseScale * 0.92f);
+
+        public void OnPointerUp(PointerEventData e) => AnimateScale(baseScale);
+
+        void AnimateScale(Vector3 target)
+        {
+            if (animRoutine != null) StopCoroutine(animRoutine);
+            if (gameObject.activeInHierarchy) animRoutine = StartCoroutine(CoScale(target));
+            else transform.localScale = target;
+        }
+
+        IEnumerator CoScale(Vector3 target)
+        {
+            Vector3 from = transform.localScale;
+            float t = 0f;
+            while (t < 0.08f)
+            {
+                t += Time.unscaledDeltaTime;
+                transform.localScale = Vector3.Lerp(from, target, t / 0.08f);
+                yield return null;
+            }
+            transform.localScale = target;
+        }
+    }
+
+    /// <summary>
+    /// Modern glassmorphic arcade HUD, animated sequenced star reveal, tactile powerup cards,
+    /// and dynamic rolling score count-up.
     /// </summary>
     public class UIManager : MonoBehaviour
     {
         public static UIManager I { get; private set; }
 
-        Text scoreText, highScoreText, levelText, movesText, pressureText, comboText, bannerText;
-        Text winScoreText, winStarsText, loseScoreText, muteButtonText;
+        Text scoreText, highScoreText, levelText, movesText, pressureText, bannerText;
+        Text comboCalloutText;
+        Text winScoreText, winConservedText, winHighScoreText, loseScoreText, muteButtonText;
+        Text[] starSlots;
+
         Button btnBomb, btnFire, btnZap, btnSwap, btnPause;
         Text btnBombText, btnFireText, btnZapText;
         Image btnBombImg, btnFireImg, btnZapImg;
+        Image btnBombGlow, btnFireGlow, btnZapGlow;
 
         GameObject winPanel, losePanel, pausePanel;
+        GameObject winCard, loseCard, pauseCard;
         Font font;
+
+        Coroutine comboRoutine;
+        Coroutine winTallyRoutine;
 
         void Awake()
         {
@@ -37,14 +150,14 @@ namespace BubbleShooter
             var go = new GameObject("Canvas");
             var c = go.AddComponent<Canvas>();
 #if UNITY_2023_1_OR_NEWER || UNITY_6000_0_OR_NEWER
-            if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            if (FindAnyObjectByType<EventSystem>() == null)
 #else
-            if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+            if (FindObjectOfType<EventSystem>() == null)
 #endif
             {
                 var es = new GameObject("EventSystem");
-                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                es.AddComponent<EventSystem>();
+                es.AddComponent<StandaloneInputModule>();
             }
             c.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = go.AddComponent<CanvasScaler>();
@@ -55,7 +168,7 @@ namespace BubbleShooter
         }
 
         Text MakeText(Transform parent, string name, string content, int size,
-                      TextAnchor anchor, Vector2 pos, Vector2 anchorPoint)
+                      TextAnchor anchor, Vector2 pos, Vector2 anchorPoint, int width = 600)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -68,53 +181,47 @@ namespace BubbleShooter
             rt.anchorMin = anchorPoint;
             rt.anchorMax = anchorPoint;
             rt.pivot = anchorPoint;
-            rt.sizeDelta = new Vector2(600, size + 20);
+            rt.sizeDelta = new Vector2(width, size + 20);
             rt.anchoredPosition = pos;
             var shadow = go.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.65f);
+            shadow.effectColor = new Color(0, 0, 0, 0.75f);
+            shadow.effectDistance = new Vector2(1.5f, -1.5f);
             return t;
         }
 
-        GameObject MakePanel(Transform parent, string name)
+        GameObject MakeCard(Transform parent, string name, Vector2 anchorPoint, Vector2 pos, Vector2 size, Sprite sprite = null, Color? tint = null)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.04f, 0.05f, 0.09f, 0.88f);
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-            rt.offsetMin = rt.offsetMax = Vector2.zero;
-            return go;
-        }
-
-        Button MakeButton(Transform parent, string label, Vector2 pos, Vector2 size, Color bgColor)
-        {
-            var go = new GameObject("Btn_" + label);
-            go.transform.SetParent(parent, false);
-            var img = go.AddComponent<Image>();
-            img.color = bgColor;
-            img.raycastTarget = true;
-            var btn = go.AddComponent<Button>();
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = size; rt.anchoredPosition = pos;
-            var t = MakeText(go.transform, "Label", label, 20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(0.5f, 0.5f));
-            t.GetComponent<RectTransform>().sizeDelta = rt.sizeDelta;
-            btn.targetGraphic = img;
-            btn.onClick.AddListener(() => AudioManager.I.Play("click"));
-            return btn;
-        }
-
-        GameObject MakeChip(Transform parent, Vector2 anchorPoint, Vector2 pos, Vector2 size, Color tint)
-        {
-            var go = new GameObject("Chip");
-            go.transform.SetParent(parent, false);
-            var img = go.AddComponent<Image>();
-            img.color = tint;
+            img.sprite = sprite ?? UISpriteFactory.GetCardSprite();
+            img.type = Image.Type.Sliced;
+            img.color = tint ?? Color.white;
             img.raycastTarget = false;
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = anchorPoint; rt.anchorMax = anchorPoint; rt.pivot = anchorPoint;
             rt.sizeDelta = size; rt.anchoredPosition = pos;
             return go;
+        }
+
+        Button MakeButton(Transform parent, string label, Vector2 pos, Vector2 size, Color bgColor, int fontSize = 20)
+        {
+            var go = new GameObject("Btn_" + label);
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.sprite = UISpriteFactory.GetButtonSprite();
+            img.type = Image.Type.Sliced;
+            img.color = bgColor;
+            img.raycastTarget = true;
+            var btn = go.AddComponent<Button>();
+            go.AddComponent<UIButtonFeedback>();
+            var rt = go.GetComponent<RectTransform>();
+            rt.sizeDelta = size; rt.anchoredPosition = pos;
+            var t = MakeText(go.transform, "Label", label, fontSize, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(0.5f, 0.5f), (int)size.x);
+            t.GetComponent<RectTransform>().sizeDelta = rt.sizeDelta;
+            btn.targetGraphic = img;
+            btn.onClick.AddListener(() => AudioManager.I.Play("click"));
+            return btn;
         }
 
         void BuildHud()
@@ -130,112 +237,206 @@ namespace BubbleShooter
             var bottomCenter = new Vector2(0.5f, 0f);
             var bottomRight = new Vector2(1f, 0f);
 
-            // Top Status Chips
-            MakeChip(root, topLeft, new Vector2(16, -12), new Vector2(240, 56), new Color(0f, 0f, 0f, 0.65f));
-            MakeChip(root, topCenter, new Vector2(0, -12), new Vector2(260, 56), new Color(0f, 0f, 0f, 0.65f));
-            MakeChip(root, topRight, new Vector2(-16, -12), new Vector2(240, 56), new Color(0f, 0f, 0f, 0.65f));
+            // ==================== TOP STATUS PILLS (Glassmorphic) ====================
+            // 1. Left Score & HighScore Card
+            MakeCard(root, "ScoreCard", topLeft, new Vector2(20, -16), new Vector2(250, 64), UISpriteFactory.GetCardSprite());
+            scoreText = MakeText(root, "Score", "SCORE 0", 24, TextAnchor.UpperLeft, new Vector2(36, -22), topLeft);
+            scoreText.color = new Color(1f, 0.88f, 0.25f);
+            highScoreText = MakeText(root, "HighScore", "🏆 BEST 0", 15, TextAnchor.UpperLeft, new Vector2(36, -50), topLeft);
+            highScoreText.color = new Color(0.85f, 0.88f, 0.95f, 0.8f);
 
-            scoreText = MakeText(root, "Score", "SCORE 0", 24, TextAnchor.UpperLeft, new Vector2(28, -16), topLeft);
-            scoreText.color = new Color(1f, 0.85f, 0.2f);
-            highScoreText = MakeText(root, "HighScore", "BEST 0", 16, TextAnchor.UpperLeft, new Vector2(28, -42), topLeft);
-            highScoreText.color = new Color(0.8f, 0.8f, 0.8f, 0.7f);
+            // 2. Center Level & Tension Meter
+            MakeCard(root, "CenterCard", topCenter, new Vector2(0, -16), new Vector2(310, 64), UISpriteFactory.GetCardSprite());
+            levelText = MakeText(root, "Level", "LEVEL 1", 23, TextAnchor.UpperCenter, new Vector2(0, -22), topCenter);
+            levelText.color = new Color(0.35f, 0.92f, 1f);
+            pressureText = MakeText(root, "Pressure", "CEILING [● ● ○]", 16, TextAnchor.UpperCenter, new Vector2(0, -50), topCenter);
+            pressureText.color = new Color(1f, 0.70f, 0.25f);
 
-            levelText = MakeText(root, "Level", "LEVEL 1", 24, TextAnchor.UpperCenter, new Vector2(0, -16), topCenter);
-            levelText.color = new Color(0.4f, 0.9f, 1f);
-            pressureText = MakeText(root, "Pressure", "CEILING IN 4", 16, TextAnchor.UpperCenter, new Vector2(0, -42), topCenter);
-            pressureText.color = new Color(1f, 0.65f, 0.3f);
+            // 3. Right Shots Left & Pause Card
+            MakeCard(root, "ShotsCard", topRight, new Vector2(-20, -16), new Vector2(260, 64), UISpriteFactory.GetCardSprite());
+            movesText = MakeText(root, "Moves", "🎯 SHOTS 30/30", 21, TextAnchor.UpperLeft, new Vector2(-215, -34), topRight, 160);
+            movesText.color = new Color(1f, 0.92f, 0.40f);
 
-            movesText = MakeText(root, "Moves", "MOVES 0", 22, TextAnchor.UpperRight, new Vector2(-80, -26), topRight);
-
-            // Pause Button (top right inside chip)
-            btnPause = MakeButton(root, "||", new Vector2(-42, -40), new Vector2(40, 40), new Color(0.2f, 0.25f, 0.35f));
+            // Pause Button (Round circular pill on right)
+            btnPause = MakeButton(root, "⏸", new Vector2(-46, -48), new Vector2(44, 44), new Color(0.18f, 0.24f, 0.35f), 22);
+            btnPause.GetComponent<Image>().sprite = UISpriteFactory.GetCircleSprite();
             btnPause.GetComponent<RectTransform>().anchorMin = topRight;
             btnPause.GetComponent<RectTransform>().anchorMax = topRight;
             btnPause.GetComponent<RectTransform>().pivot = topRight;
             btnPause.onClick.AddListener(() => GameManager.I.TogglePause());
 
-            comboText = MakeText(root, "Combo", "", 36, TextAnchor.MiddleCenter, new Vector2(0, -110), center);
-            comboText.color = new Color(1f, 0.85f, 0.2f);
+            // Center Dynamic Combo Callout Banner
+            comboCalloutText = MakeText(root, "ComboCallout", "", 38, TextAnchor.MiddleCenter, new Vector2(0, 140), center);
+            comboCalloutText.color = new Color(1f, 0.85f, 0.2f);
+            comboCalloutText.gameObject.SetActive(false);
 
-            // Power-Up Action Bar (Bottom Right & Center)
-            btnSwap = MakeButton(root, "SWAP [X]", new Vector2(16, 20), new Vector2(130, 48), new Color(0.18f, 0.45f, 0.75f));
+            // ==================== BOTTOM ACTION BAR (Arcade Powerups) ====================
+            // Swap Bubble Action Button (Bottom Left)
+            btnSwap = MakeButton(root, "🔄 SWAP [X]", new Vector2(20, 22), new Vector2(148, 52), new Color(0.16f, 0.42f, 0.72f), 18);
             btnSwap.GetComponent<RectTransform>().anchorMin = bottomLeft;
             btnSwap.GetComponent<RectTransform>().anchorMax = bottomLeft;
             btnSwap.GetComponent<RectTransform>().pivot = bottomLeft;
             btnSwap.onClick.AddListener(() => GameManager.I.Shooter.Swap());
 
-            btnBomb = MakeButton(root, "BOMB [B] x2", new Vector2(-360, 20), new Vector2(140, 48), new Color(0.35f, 0.18f, 0.22f));
+            // 💣 BOMB CARD
+            btnBomb = MakeButton(root, "💣 BOMB [B]\nx2", new Vector2(-380, 22), new Vector2(138, 52), new Color(0.38f, 0.16f, 0.20f), 16);
             btnBomb.GetComponent<RectTransform>().anchorMin = bottomRight;
             btnBomb.GetComponent<RectTransform>().anchorMax = bottomRight;
             btnBomb.GetComponent<RectTransform>().pivot = bottomRight;
             btnBombImg = btnBomb.GetComponent<Image>();
             btnBombText = btnBomb.GetComponentInChildren<Text>();
+            btnBombGlow = AddGlowRing(btnBomb.transform, new Color(1f, 0.3f, 0.3f));
             btnBomb.onClick.AddListener(() => GameManager.I.Shooter.ToggleBomb());
 
-            btnFire = MakeButton(root, "FIRE [F] x1", new Vector2(-210, 20), new Vector2(140, 48), new Color(0.45f, 0.22f, 0.08f));
+            // 🔥 FIREBALL CARD
+            btnFire = MakeButton(root, "🔥 FIRE [F]\nx1", new Vector2(-230, 22), new Vector2(138, 52), new Color(0.48f, 0.24f, 0.08f), 16);
             btnFire.GetComponent<RectTransform>().anchorMin = bottomRight;
             btnFire.GetComponent<RectTransform>().anchorMax = bottomRight;
             btnFire.GetComponent<RectTransform>().pivot = bottomRight;
             btnFireImg = btnFire.GetComponent<Image>();
             btnFireText = btnFire.GetComponentInChildren<Text>();
+            btnFireGlow = AddGlowRing(btnFire.transform, new Color(1f, 0.6f, 0.1f));
             btnFire.onClick.AddListener(() => GameManager.I.Shooter.ToggleFireball());
 
-            btnZap = MakeButton(root, "ZAP [L] x1", new Vector2(-60, 20), new Vector2(140, 48), new Color(0.12f, 0.42f, 0.52f));
+            // ⚡ LIGHTNING CARD
+            btnZap = MakeButton(root, "⚡ ZAP [L]\nx1", new Vector2(-80, 22), new Vector2(138, 52), new Color(0.12f, 0.45f, 0.58f), 16);
             btnZap.GetComponent<RectTransform>().anchorMin = bottomRight;
             btnZap.GetComponent<RectTransform>().anchorMax = bottomRight;
             btnZap.GetComponent<RectTransform>().pivot = bottomRight;
             btnZapImg = btnZap.GetComponent<Image>();
             btnZapText = btnZap.GetComponentInChildren<Text>();
+            btnZapGlow = AddGlowRing(btnZap.transform, new Color(0.2f, 0.9f, 1f));
             btnZap.onClick.AddListener(() => GameManager.I.Shooter.ToggleLightning());
 
-            MakeText(root, "Hint", "Aim: Mouse | Fire: Left Click | Shortcuts: [X] Swap, [B] Bomb, [F] Fireball, [L] Zap, [ESC] Pause",
-                     15, TextAnchor.LowerCenter, new Vector2(-60, 20), bottomCenter)
+            MakeText(root, "Hint", "Aim: Mouse  |  Fire: Left Click  |  Shortcuts: [X] Swap, [B] Bomb, [F] Fire, [L] Zap, [ESC] Pause",
+                     14, TextAnchor.LowerCenter, new Vector2(-70, 24), bottomCenter)
                 .color = new Color(1f, 1f, 1f, 0.45f);
 
-            bannerText = MakeText(root, "Banner", "", 54, TextAnchor.MiddleCenter, new Vector2(0, 60), center);
+            bannerText = MakeText(root, "Banner", "", 52, TextAnchor.MiddleCenter, new Vector2(0, 60), center);
 
-            // Win Panel with Stars
-            winPanel = MakePanel(root, "WinPanel");
-            MakeText(winPanel.transform, "WinTitle", "LEVEL CLEARED!", 58,
-                     TextAnchor.MiddleCenter, new Vector2(0, 160), center).color = new Color(0.3f, 1f, 0.5f);
-            winStarsText = MakeText(winPanel.transform, "WinStars", "★★★", 52,
-                                    TextAnchor.MiddleCenter, new Vector2(0, 85), center);
-            winStarsText.color = new Color(1f, 0.85f, 0.15f);
-            winScoreText = MakeText(winPanel.transform, "WinScore", "SCORE 0", 28,
-                                    TextAnchor.MiddleCenter, new Vector2(0, 20), center);
-            var next = MakeButton(winPanel.transform, "NEXT LEVEL", new Vector2(0, -60), new Vector2(240, 54), new Color(0.2f, 0.7f, 0.35f));
+            // ==================== MODAL PANELS (Win, Lose, Pause) ====================
+            BuildWinPanel(root, center);
+            BuildLosePanel(root, center);
+            BuildPausePanel(root, center);
+        }
+
+        Image AddGlowRing(Transform parent, Color col)
+        {
+            var go = new GameObject("GlowRing");
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.sprite = UISpriteFactory.GetGlowFrameSprite();
+            img.type = Image.Type.Sliced;
+            img.color = col;
+            img.raycastTarget = false;
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.sizeDelta = new Vector2(10, 10);
+            rt.anchoredPosition = Vector2.zero;
+            go.SetActive(false);
+            return img;
+        }
+
+        void BuildWinPanel(Transform root, Vector2 center)
+        {
+            winPanel = new GameObject("WinPanel");
+            winPanel.transform.SetParent(root, false);
+            var bg = winPanel.AddComponent<Image>();
+            bg.color = new Color(0.02f, 0.04f, 0.08f, 0.82f);
+            var rt = winPanel.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            winCard = MakeCard(winPanel.transform, "WinCard", center, Vector2.zero, new Vector2(520, 520),
+                               UISpriteFactory.GetCardSprite(), new Color(0.08f, 0.12f, 0.20f, 0.96f));
+
+            MakeText(winCard.transform, "WinTitle", "VICTORY!", 54, TextAnchor.MiddleCenter, new Vector2(0, 195), center)
+                .color = new Color(0.35f, 1f, 0.65f);
+
+            // 3 Animated Star Slots
+            starSlots = new Text[3];
+            float[] starX = { -95f, 0f, 95f };
+            for (int i = 0; i < 3; i++)
+            {
+                var s = MakeText(winCard.transform, "Star_" + i, "★", 62, TextAnchor.MiddleCenter, new Vector2(starX[i], 115), center, 90);
+                s.color = new Color(0.25f, 0.28f, 0.35f, 0.5f); // Unearned grey
+                starSlots[i] = s;
+            }
+
+            winScoreText = MakeText(winCard.transform, "WinScore", "SCORE 0", 34, TextAnchor.MiddleCenter, new Vector2(0, 30), center);
+            winScoreText.color = new Color(1f, 0.88f, 0.2f);
+
+            winConservedText = MakeText(winCard.transform, "WinConserved", "", 18, TextAnchor.MiddleCenter, new Vector2(0, -18), center);
+            winConservedText.color = new Color(0.4f, 0.9f, 0.55f);
+
+            winHighScoreText = MakeText(winCard.transform, "WinHigh", "BEST 0", 16, TextAnchor.MiddleCenter, new Vector2(0, -52), center);
+            winHighScoreText.color = new Color(0.85f, 0.88f, 0.95f, 0.7f);
+
+            var next = MakeButton(winCard.transform, "NEXT LEVEL ▶", new Vector2(0, -125), new Vector2(280, 56), new Color(0.18f, 0.72f, 0.38f), 22);
             next.onClick.AddListener(() => { winPanel.SetActive(false); GameManager.I.NextLevel(); });
-            var winRestart = MakeButton(winPanel.transform, "REPLAY LEVEL", new Vector2(0, -130), new Vector2(240, 46), new Color(0.25f, 0.3f, 0.45f));
+
+            var winRestart = MakeButton(winCard.transform, "REPLAY ↺", new Vector2(0, -195), new Vector2(280, 48), new Color(0.24f, 0.32f, 0.48f), 19);
             winRestart.onClick.AddListener(() => { winPanel.SetActive(false); GameManager.I.Restart(); });
+
             winPanel.SetActive(false);
+        }
 
-            // Lose Panel
-            losePanel = MakePanel(root, "LosePanel");
-            MakeText(losePanel.transform, "LoseTitle", "GAME OVER", 58,
-                     TextAnchor.MiddleCenter, new Vector2(0, 140), center).color = new Color(1f, 0.35f, 0.35f);
-            loseScoreText = MakeText(losePanel.transform, "LoseScore", "SCORE 0", 28,
-                                     TextAnchor.MiddleCenter, new Vector2(0, 40), center);
-            var retry = MakeButton(losePanel.transform, "TRY AGAIN", new Vector2(0, -50), new Vector2(240, 56), new Color(0.85f, 0.25f, 0.25f));
+        void BuildLosePanel(Transform root, Vector2 center)
+        {
+            losePanel = new GameObject("LosePanel");
+            losePanel.transform.SetParent(root, false);
+            var bg = losePanel.AddComponent<Image>();
+            bg.color = new Color(0.08f, 0.02f, 0.02f, 0.85f);
+            var rt = losePanel.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            loseCard = MakeCard(losePanel.transform, "LoseCard", center, Vector2.zero, new Vector2(480, 420),
+                                UISpriteFactory.GetCardSprite(), new Color(0.16f, 0.06f, 0.08f, 0.96f));
+
+            MakeText(loseCard.transform, "LoseTitle", "GAME OVER", 54, TextAnchor.MiddleCenter, new Vector2(0, 140), center)
+                .color = new Color(1f, 0.32f, 0.32f);
+
+            loseScoreText = MakeText(loseCard.transform, "LoseScore", "OUT OF SHOTS!\n\nSCORE 0", 22, TextAnchor.MiddleCenter, new Vector2(0, 35), center);
+
+            var retry = MakeButton(loseCard.transform, "TRY AGAIN ↺", new Vector2(0, -65), new Vector2(260, 58), new Color(0.88f, 0.24f, 0.24f), 22);
             retry.onClick.AddListener(() => { losePanel.SetActive(false); GameManager.I.Restart(); });
-            losePanel.SetActive(false);
 
-            // Pause Panel
-            pausePanel = MakePanel(root, "PausePanel");
-            MakeText(pausePanel.transform, "PauseTitle", "GAME PAUSED", 54,
-                     TextAnchor.MiddleCenter, new Vector2(0, 140), center).color = new Color(0.9f, 0.9f, 1f);
-            var resumeBtn = MakeButton(pausePanel.transform, "RESUME", new Vector2(0, 30), new Vector2(240, 52), new Color(0.2f, 0.6f, 0.9f));
+            losePanel.SetActive(false);
+        }
+
+        void BuildPausePanel(Transform root, Vector2 center)
+        {
+            pausePanel = new GameObject("PausePanel");
+            pausePanel.transform.SetParent(root, false);
+            var bg = pausePanel.AddComponent<Image>();
+            bg.color = new Color(0.02f, 0.04f, 0.08f, 0.85f);
+            var rt = pausePanel.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            pauseCard = MakeCard(pausePanel.transform, "PauseCard", center, Vector2.zero, new Vector2(440, 400),
+                                 UISpriteFactory.GetCardSprite(), new Color(0.09f, 0.12f, 0.20f, 0.96f));
+
+            MakeText(pauseCard.transform, "PauseTitle", "GAME PAUSED", 48, TextAnchor.MiddleCenter, new Vector2(0, 130), center)
+                .color = new Color(0.85f, 0.92f, 1f);
+
+            var resumeBtn = MakeButton(pauseCard.transform, "RESUME ▶", new Vector2(0, 35), new Vector2(260, 54), new Color(0.18f, 0.62f, 0.95f), 22);
             resumeBtn.onClick.AddListener(() => GameManager.I.TogglePause());
-            var muteBtn = MakeButton(pausePanel.transform, "AUDIO: ON", new Vector2(0, -40), new Vector2(240, 52), new Color(0.35f, 0.4f, 0.5f));
+
+            var muteBtn = MakeButton(pauseCard.transform, "AUDIO: ON", new Vector2(0, -38), new Vector2(260, 52), new Color(0.28f, 0.34f, 0.48f), 20);
             muteButtonText = muteBtn.GetComponentInChildren<Text>();
             muteBtn.onClick.AddListener(() => {
                 AudioManager.I.ToggleMute();
                 UpdateMuteButtonText();
             });
-            var pauseRestart = MakeButton(pausePanel.transform, "RESTART", new Vector2(0, -110), new Vector2(240, 52), new Color(0.75f, 0.3f, 0.3f));
+
+            var pauseRestart = MakeButton(pauseCard.transform, "RESTART LEVEL ↺", new Vector2(0, -110), new Vector2(260, 50), new Color(0.72f, 0.28f, 0.28f), 19);
             pauseRestart.onClick.AddListener(() => {
                 GameManager.I.TogglePause();
                 GameManager.I.Restart();
             });
+
             pausePanel.SetActive(false);
             UpdateMuteButtonText();
         }
@@ -243,7 +444,7 @@ namespace BubbleShooter
         void UpdateMuteButtonText()
         {
             if (muteButtonText != null)
-                muteButtonText.text = AudioManager.I.IsMuted ? "AUDIO: MUTED" : "AUDIO: ACTIVE";
+                muteButtonText.text = AudioManager.I.IsMuted ? "🔇 AUDIO: MUTED" : "🔊 AUDIO: ACTIVE";
         }
 
         public void SetHud(int popped = 0, int dropped = 0)
@@ -252,7 +453,7 @@ namespace BubbleShooter
             if (g == null) return;
 
             scoreText.text = $"SCORE {g.Score:N0}";
-            highScoreText.text = $"BEST {g.HighScore:N0}";
+            highScoreText.text = $"🏆 BEST {g.HighScore:N0}";
             levelText.text = $"LEVEL {g.Level}";
 
             int remaining = g.MovesRemaining;
@@ -263,7 +464,7 @@ namespace BubbleShooter
             }
             else
             {
-                movesText.text = $"SHOTS {remaining}/{g.MaxMoves}";
+                movesText.text = $"🎯 SHOTS {remaining}/{g.MaxMoves}";
                 movesText.color = new Color(1f, 0.88f, 0.35f);
             }
 
@@ -284,32 +485,93 @@ namespace BubbleShooter
                 pressureText.color = new Color(1f, 0.65f, 0.3f);
             }
 
-            // Power-up button updates
+            // Power-up button updates with pulsing glowing rings
             var shooter = g.Shooter;
             bool bombArmed = shooter != null && shooter.ActivePowerup == PowerupType.Bomb;
             bool fireArmed = shooter != null && shooter.ActivePowerup == PowerupType.Fireball;
             bool zapArmed = shooter != null && shooter.ActivePowerup == PowerupType.Lightning;
 
-            btnBombText.text = $"BOMB [B] x{g.BombsLeft}";
-            btnBombImg.color = bombArmed ? new Color(0.95f, 0.25f, 0.25f) : new Color(0.35f, 0.18f, 0.22f);
+            btnBombText.text = $"💣 BOMB [B]\nx{g.BombsLeft}";
+            btnBombImg.color = bombArmed ? new Color(0.95f, 0.25f, 0.25f) : new Color(0.38f, 0.16f, 0.20f);
+            btnBombGlow.gameObject.SetActive(bombArmed);
 
-            btnFireText.text = $"FIRE [F] x{g.FireballsLeft}";
-            btnFireImg.color = fireArmed ? new Color(1.0f, 0.5f, 0.05f) : new Color(0.45f, 0.22f, 0.08f);
+            btnFireText.text = $"🔥 FIRE [F]\nx{g.FireballsLeft}";
+            btnFireImg.color = fireArmed ? new Color(1.0f, 0.5f, 0.05f) : new Color(0.48f, 0.24f, 0.08f);
+            btnFireGlow.gameObject.SetActive(fireArmed);
 
-            btnZapText.text = $"ZAP [L] x{g.LightningsLeft}";
-            btnZapImg.color = zapArmed ? new Color(0.2f, 0.85f, 1f) : new Color(0.12f, 0.42f, 0.52f);
+            btnZapText.text = $"⚡ ZAP [L]\nx{g.LightningsLeft}";
+            btnZapImg.color = zapArmed ? new Color(0.2f, 0.85f, 1f) : new Color(0.12f, 0.45f, 0.58f);
+            btnZapGlow.gameObject.SetActive(zapArmed);
 
-            comboText.text = g.Combo > 1 ? $"COMBO x{g.Combo}!" : "";
-            if (dropped > 0) comboText.text += $"  +{dropped} DROPPED!";
+            // Dynamic Combo streak callout
+            if (g.Combo > 1)
+            {
+                ShowComboCallout(g.Combo, dropped);
+            }
+        }
+
+        void ShowComboCallout(int combo, int dropped)
+        {
+            if (comboRoutine != null) StopCoroutine(comboRoutine);
+            comboRoutine = StartCoroutine(CoComboCallout(combo, dropped));
+        }
+
+        IEnumerator CoComboCallout(int combo, int dropped)
+        {
+            comboCalloutText.gameObject.SetActive(true);
+            string title = combo switch
+            {
+                2 => "⚡ 2x COMBO!",
+                3 => "🔥 3x ON FIRE!",
+                4 => "💥 4x MEGA STRIKE!",
+                _ => $"👑 {combo}x UNSTOPPABLE!"
+            };
+            Color col = combo switch
+            {
+                2 => new Color(0.3f, 0.85f, 1f),
+                3 => new Color(1f, 0.65f, 0.1f),
+                4 => new Color(0.95f, 0.35f, 1f),
+                _ => new Color(1f, 0.85f, 0.15f)
+            };
+            if (dropped > 0) title += $"\n+{dropped} DROPPED!";
+            comboCalloutText.text = title;
+            comboCalloutText.color = col;
+
+            // Punch scale bounce
+            float t = 0f;
+            while (t < 0.2f)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Sin(t / 0.2f * Mathf.PI * 0.5f);
+                comboCalloutText.transform.localScale = Vector3.Lerp(Vector3.one * 0.5f, Vector3.one * 1.35f, k);
+                yield return null;
+            }
+            t = 0f;
+            while (t < 0.15f)
+            {
+                t += Time.deltaTime;
+                comboCalloutText.transform.localScale = Vector3.Lerp(Vector3.one * 1.35f, Vector3.one, t / 0.15f);
+                yield return null;
+            }
+            yield return new WaitForSeconds(1.2f);
+            t = 0f;
+            while (t < 0.25f)
+            {
+                t += Time.deltaTime;
+                var c = comboCalloutText.color; c.a = 1f - (t / 0.25f);
+                comboCalloutText.color = c;
+                yield return null;
+            }
+            comboCalloutText.gameObject.SetActive(false);
+            comboRoutine = null;
         }
 
         public void ShowLevelBanner(string text, Color? accent = null)
         {
             bannerText.text = text;
-            if (accent.HasValue) bannerText.color = accent.Value;
-            else bannerText.color = new Color(0.4f, 0.9f, 1f);
-            CancelInvoke();
-            Invoke(nameof(ClearBanner), 2.2f);
+            bannerText.color = accent ?? new Color(0.4f, 0.9f, 1f);
+            CancelInvoke(nameof(ClearBanner));
+            Invoke(nameof(ClearBanner), 2.4f);
         }
 
         public void ShowLevelBanner(int level) => ShowLevelBanner($"LEVEL {level}");
@@ -321,6 +583,7 @@ namespace BubbleShooter
             if (pausePanel != null)
             {
                 pausePanel.SetActive(paused);
+                if (paused && pauseCard != null) StartCoroutine(CoCardPop(pauseCard.transform));
                 UpdateMuteButtonText();
             }
         }
@@ -328,20 +591,94 @@ namespace BubbleShooter
         public void ShowWin(int score, int level, int stars = 3)
         {
             winPanel.SetActive(true);
-            winStarsText.text = stars switch
+            if (winTallyRoutine != null) StopCoroutine(winTallyRoutine);
+            winTallyRoutine = StartCoroutine(CoWinSequence(score, level, stars));
+        }
+
+        IEnumerator CoWinSequence(int targetScore, int level, int stars)
+        {
+            AudioManager.I.Play("whoosh");
+            yield return StartCoroutine(CoCardPop(winCard.transform));
+
+            // Reset star slots
+            for (int i = 0; i < 3; i++)
             {
-                3 => "★ ★ ★",
-                2 => "★ ★ ☆",
-                _ => "★ ☆ ☆"
-            };
-            winScoreText.text = $"SCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}\n\n<color=#4ADE80>SHOTS CONSERVED: {GameManager.I.MovesRemaining}</color>";
+                starSlots[i].color = new Color(0.25f, 0.28f, 0.35f, 0.45f);
+                starSlots[i].transform.localScale = Vector3.one * 0.85f;
+            }
+
+            int conserved = GameManager.I.MovesRemaining;
+            int bonus = conserved * 50;
+            winConservedText.text = $"<color=#4ADE80>SHOTS CONSERVED: +{conserved} (x50 = +{bonus:N0} PTS)</color>";
+            winHighScoreText.text = $"🏆 HIGH SCORE: {GameManager.I.HighScore:N0}";
+
+            // Sequenced Star Drops
+            for (int i = 0; i < stars; i++)
+            {
+                yield return new WaitForSecondsRealtime(0.22f);
+                var slot = starSlots[i];
+                slot.color = new Color(1f, 0.88f, 0.18f);
+                AudioManager.I.PlayStarChime(i);
+
+                // Punch scale animation on star
+                float t = 0f;
+                while (t < 0.2f)
+                {
+                    t += Time.unscaledDeltaTime;
+                    float k = Mathf.Sin(t / 0.2f * Mathf.PI * 0.5f);
+                    slot.transform.localScale = Vector3.Lerp(Vector3.one * 1.8f, Vector3.one * 1.0f, k);
+                    yield return null;
+                }
+                slot.transform.localScale = Vector3.one;
+            }
+
+            // Rolling score count-up (Odometer)
+            float elapsed = 0f;
+            float duration = 0.85f;
+            int startScore = Mathf.Max(0, targetScore - 1200);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                int current = (int)Mathf.Lerp(startScore, targetScore, elapsed / duration);
+                winScoreText.text = $"SCORE {current:N0}";
+                AudioManager.I.Play("tick");
+                yield return new WaitForSecondsRealtime(0.04f);
+            }
+            winScoreText.text = $"SCORE {targetScore:N0}";
+            winTallyRoutine = null;
         }
 
         public void ShowLose(int score, int level)
         {
             losePanel.SetActive(true);
-            string reason = GameManager.I.MovesRemaining <= 0 ? "OUT OF SHOTS!" : "BUBBLES CROSSED THE LINE!";
-            loseScoreText.text = $"<color=#F87171>{reason}</color>\n\nSCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}";
+            AudioManager.I.Play("whoosh");
+            if (loseCard != null) StartCoroutine(CoCardPop(loseCard.transform));
+
+            string reason = GameManager.I.MovesRemaining <= 0 ? "⚠️ OUT OF SHOTS!" : "⚠️ BUBBLES CROSSED THE LINE!";
+            loseScoreText.text = $"<color=#F87171>{reason}</color>\n\nFINAL SCORE: {score:N0}\n🏆 BEST: {GameManager.I.HighScore:N0}";
+        }
+
+        IEnumerator CoCardPop(Transform card)
+        {
+            float t = 0f;
+            while (t < 0.25f)
+            {
+                t += Time.unscaledDeltaTime;
+                float p = t / 0.25f;
+                // Elastic bounce curve: 0.5 -> 1.08 -> 1.0
+                float s = Mathf.Sin(p * Mathf.PI * 0.5f);
+                card.localScale = Vector3.Lerp(Vector3.one * 0.55f, Vector3.one * 1.05f, s);
+                yield return null;
+            }
+            t = 0f;
+            while (t < 0.12f)
+            {
+                t += Time.unscaledDeltaTime;
+                card.localScale = Vector3.Lerp(Vector3.one * 1.05f, Vector3.one, t / 0.12f);
+                yield return null;
+            }
+            card.localScale = Vector3.one;
         }
     }
 }
