@@ -108,6 +108,10 @@ namespace BubbleShooter
                     {
                         AudioManager.I.PlayDropBounce(dropIndex);
                     }
+                    if (GameManager.I != null)
+                    {
+                        GameManager.I.TriggerCollectorPod(transform.position);
+                    }
                     // Bouncy rebound upward with dampening
 #if UNITY_6000_0_OR_NEWER
                     rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.5f, Random.Range(2.8f, 4.2f), rb.linearVelocity.z);

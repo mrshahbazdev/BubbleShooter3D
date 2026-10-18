@@ -168,6 +168,7 @@ namespace BubbleShooter
         Light accentLeft, accentRight;
         Material backdropMat, floorMat;
         List<Material> railMats = new List<Material>();
+        List<Material> outerNeonMats = new List<Material>();
         ParticleSystem starfield;
         Shooter shooter;
         Coroutine transitionRoutine;
@@ -176,7 +177,7 @@ namespace BubbleShooter
 
         public void Init(Camera cam, Light key, Light fill, Light accLeft, Light accRight,
                          Material backdrop, Material floor, List<Material> rails,
-                         ParticleSystem starfield, Shooter shooter)
+                         ParticleSystem starfield, Shooter shooter, List<Material> outerNeon = null)
         {
             I = this;
             this.cam = cam;
@@ -187,6 +188,7 @@ namespace BubbleShooter
             this.backdropMat = backdrop;
             this.floorMat = floor;
             this.railMats = rails ?? new List<Material>();
+            this.outerNeonMats = outerNeon ?? new List<Material>();
             this.starfield = starfield;
             this.shooter = shooter;
         }
@@ -232,6 +234,13 @@ namespace BubbleShooter
                 m.SetColor("_EmissionColor", t.RailEmission * 0.8f);
             }
 
+            foreach (var m in outerNeonMats)
+            {
+                if (m == null) continue;
+                m.color = t.Accent * 0.8f;
+                m.SetColor("_EmissionColor", t.Accent * 0.85f);
+            }
+
             if (starfield != null)
             {
                 var main = starfield.main;
@@ -275,6 +284,14 @@ namespace BubbleShooter
                     if (m == null) continue;
                     m.color = currentRail * 0.7f;
                     m.SetColor("_EmissionColor", currentRail * 0.8f);
+                }
+
+                Color currentOuter = Color.Lerp(fromRail, target.Accent, p);
+                foreach (var m in outerNeonMats)
+                {
+                    if (m == null) continue;
+                    m.color = currentOuter * 0.8f;
+                    m.SetColor("_EmissionColor", currentOuter * 0.85f);
                 }
 
                 yield return null;

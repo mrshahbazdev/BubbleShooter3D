@@ -249,6 +249,21 @@ namespace BubbleShooter
                         continue;
                     }
 
+                    // Stone obstacle boulders for level 3+ (must be dropped or bombed!)
+                    if (level >= 3 && r >= 2)
+                    {
+                        bool isStone = false;
+                        if (level == 3 && r == 3 && (c == 2 || c == cols - 3)) isStone = true;
+                        else if (level == 4 && (r == 2 || r == 3) && (c == cols / 2 || c == cols / 2 - 1)) isStone = true;
+                        else if (level >= 5 && r >= 3 && (c % 3 == 1) && Random.value < 0.26f) isStone = true;
+
+                        if (isStone)
+                        {
+                            PlaceBubble(BubbleColor.Stone, r, c);
+                            continue;
+                        }
+                    }
+
                     // Cluster generation: 50% chance to inherit color from adjacent neighbor
                     // This generates natural match-3 setups that make real commercial bubble shooters so fun!
                     BubbleColor col;

@@ -54,8 +54,11 @@ namespace BubbleShooter
             clips["descend"] = Tone(196f, 0.18f, "square", 0.3f, decay: 5f);
             clips["combo"] = Arpeggio(new[] { 587f, 740f, 880f, 1174f }, 0.08f);
             clips["win"] = Arpeggio(new[] { 523f, 659f, 784f, 1046f }, 0.12f);
-            clips["lose"] = Arpeggio(new[] { 392f, 330f, 262f, 196f }, 0.16f);
             clips["click"] = Tone(660f, 0.05f, "sine", 0.3f, decay: 10f);
+            clips["alarm"] = SweepTone(750f, 520f, 0.22f, "saw", 0.45f);
+            clips["tick"] = Tone(180f, 0.04f, "triangle", 0.5f, decay: 15f);
+            clips["podHit"] = Arpeggio(new[] { 523f, 659f, 784f }, 0.05f);
+            clips["swap"] = SweepTone(260f, 520f, 0.08f, "sine", 0.4f);
 
             // Generate relaxing procedural BGM
             bgmSrc.clip = GenerateAmbientBGM();

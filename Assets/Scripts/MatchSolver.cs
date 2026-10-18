@@ -34,8 +34,9 @@ namespace BubbleShooter
 
         static List<Vector2Int> Cluster(BubbleBoard board, int r, int c, BubbleColor target)
         {
+            if (target == BubbleColor.Stone) return new List<Vector2Int>();
             bool Matches(Bubble b) =>
-                b != null && (b.Color == target || b.Color == BubbleColor.Rainbow);
+                b != null && b.Color != BubbleColor.Stone && (b.Color == target || b.Color == BubbleColor.Rainbow);
             var seen = new HashSet<Vector2Int>();
             var cluster = new List<Vector2Int>();
             var stack = new Stack<Vector2Int>();

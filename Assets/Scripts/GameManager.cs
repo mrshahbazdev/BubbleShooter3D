@@ -18,6 +18,8 @@ namespace BubbleShooter
         public int HighScore { get; private set; }
         public int Level { get; private set; } = 1;
         public int Moves { get; private set; }
+        public int MaxMoves { get; private set; } = 30;
+        public int MovesRemaining => Mathf.Max(0, MaxMoves - Moves);
         public int Combo { get; private set; }
         public int BombsLeft = 2;
         public int FireballsLeft = 1;
@@ -28,6 +30,7 @@ namespace BubbleShooter
         public Shooter Shooter { get; private set; }
 
         int shotsSinceDescend;
+        float lastAlarmTime = -10f;
         public int ShotsPerDescend => Mathf.Max(3, 7 - Level / 2); // pressure ramps with level
         public int ShotsUntilDescend => Mathf.Max(0, ShotsPerDescend - shotsSinceDescend);
 
@@ -67,6 +70,16 @@ namespace BubbleShooter
             FireballsLeft = 1 + level / 3;
             LightningsLeft = 1 + level / 3;
 
+            // Progressive move constraints as level climbs
+            MaxMoves = level switch
+            {
+                1 => 30,
+                2 => 26,
+                3 => 23,
+                4 => 20,
+                _ => Mathf.Max(14, 20 - (level - 4))
+            };
+
             int rows = Mathf.Min(5 + level, 9);
             int colors = Mathf.Min(3 + level, 6);
             Board.TopY = 6.4f;
@@ -80,6 +93,44 @@ namespace BubbleShooter
                 UIManager.I.SetHud();
                 UIManager.I.ShowLevelBanner($"LEVEL {level}\n{CurrentThemeName}", CurrentThemeAccent);
             }
+        }
+
+        /// <summary>
+        /// Called when a falling bubble bounces into one of the 5 bottom score collector pods.
+        /// </summary>
+        public void TriggerCollectorPod(Vector3 hitPos)
+        {
+            int pts = 50;
+            string label = "+50";
+            Color col = new Color(0.35f, 0.85f, 1f);
+
+            if (Mathf.Abs(hitPos.x) < 0.9f)
+            {
+                pts = 500;
+                label = "★ 500 JACKPOT! ★";
+                col = new Color(1f, 0.85f, 0.15f);
+                AudioManager.I.Play("combo");
+                EffectsManager.I.Shake(0.18f);
+            }
+            else if (Mathf.Abs(hitPos.x) < 2.5f)
+            {
+                pts = 150;
+                label = "+150 POD BONUS";
+                col = new Color(0.2f, 1f, 0.6f);
+                AudioManager.I.Play("podHit");
+            }
+            else
+            {
+                pts = 50;
+                label = "+50";
+                col = new Color(0.4f, 0.85f, 1f);
+                AudioManager.I.Play("podHit");
+            }
+
+            Score += pts;
+            UpdateHighScore();
+            EffectsManager.I.Popup(new Vector3(hitPos.x, -3.2f, -0.6f), label, col);
+            if (UIManager.I != null) UIManager.I.SetHud();
         }
 
         public void OnProjectileSnapped(Projectile p, Vector2Int cell, Vector3 contact)
@@ -274,11 +325,7 @@ namespace BubbleShooter
             if (Board.Count == 0)
             {
                 State = GameState.Won;
-                Score += 500 + Level * 250;
-                UpdateHighScore();
-                AudioManager.I.Play("win");
-                int stars = CalculateStars(Moves, Level);
-                if (UIManager.I != null) UIManager.I.ShowWin(Score, Level, stars);
+                StartCoroutine(CoVictorySequence());
             }
             else if (Board.AnyBubbleBelowDeathLine())
             {
@@ -286,17 +333,61 @@ namespace BubbleShooter
                 AudioManager.I.Play("lose");
                 if (UIManager.I != null) UIManager.I.ShowLose(Score, Level);
             }
+            else if (MovesRemaining <= 0)
+            {
+                State = GameState.Lost;
+                AudioManager.I.Play("lose");
+                EffectsManager.I.Popup(new Vector3(0f, 0f, -1f), "OUT OF SHOTS!", new Color(1f, 0.3f, 0.3f));
+                if (UIManager.I != null) UIManager.I.ShowLose(Score, Level);
+            }
             else
             {
+                CheckDangerSiren();
                 Shooter.OnProjectileDone();
             }
         }
 
+        void CheckDangerSiren()
+        {
+            if (Time.time - lastAlarmTime < 4f) return;
+            bool inDanger = false;
+            foreach (var b in Board.AllBubbles())
+            {
+                if (b != null && b.transform.position.y <= Board.DeathLineY + 1.1f)
+                {
+                    inDanger = true;
+                    break;
+                }
+            }
+            if (inDanger)
+            {
+                lastAlarmTime = Time.time;
+                AudioManager.I.Play("alarm");
+                EffectsManager.I.Popup(new Vector3(0f, Board.DeathLineY + 0.6f, -1f), "⚠️ DANGER! BUBBLES NEAR LINE", new Color(1f, 0.35f, 0.2f));
+            }
+        }
+
+        IEnumerator CoVictorySequence()
+        {
+            Time.timeScale = 0.35f;
+            EffectsManager.I.MegaConfetti(new Vector3(0f, 1.5f, -1f));
+            EffectsManager.I.Shake(0.35f);
+            AudioManager.I.Play("combo");
+            yield return new WaitForSecondsRealtime(0.85f);
+            Time.timeScale = 1f;
+
+            Score += 500 + Level * 250;
+            UpdateHighScore();
+            AudioManager.I.Play("win");
+            int stars = CalculateStars(Moves, Level);
+            if (UIManager.I != null) UIManager.I.ShowWin(Score, Level, stars);
+        }
+
         public int CalculateStars(int moves, int level)
         {
-            int par = 12 + level * 2;
-            if (moves <= par) return 3;
-            if (moves <= par + 6) return 2;
+            // Award stars dynamically based on moves conserved
+            if (MovesRemaining >= MaxMoves * 0.4f) return 3;
+            if (MovesRemaining >= MaxMoves * 0.15f) return 2;
             return 1;
         }
 

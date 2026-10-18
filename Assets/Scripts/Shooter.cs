@@ -233,7 +233,7 @@ namespace BubbleShooter
             ActivePowerup = PowerupType.None;
             UpdateCurrentMaterial();
             UpdateNextMaterial();
-            AudioManager.I.Play("click");
+            AudioManager.I.Play("swap");
             if (UIManager.I != null) UIManager.I.SetHud();
         }
 

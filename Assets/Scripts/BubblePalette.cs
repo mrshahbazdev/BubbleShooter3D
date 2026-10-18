@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BubbleShooter
 {
-    public enum BubbleColor { Red, Green, Blue, Yellow, Purple, Orange, Bomb, Rainbow, Fireball, Lightning }
+    public enum BubbleColor { Red, Green, Blue, Yellow, Purple, Orange, Bomb, Rainbow, Fireball, Lightning, Stone }
 
     public static class BubblePalette
     {
@@ -18,6 +18,7 @@ namespace BubbleShooter
             new Color(0.90f, 0.90f, 0.95f), // Rainbow
             new Color(1.00f, 0.35f, 0.05f), // Fireball
             new Color(0.20f, 0.95f, 1.00f), // Lightning
+            new Color(0.48f, 0.49f, 0.52f), // Stone
         };
 
         public static bool IsPlayable(BubbleColor c) => (int)c <= (int)BubbleColor.Orange;
@@ -28,7 +29,14 @@ namespace BubbleShooter
             Color baseCol = Colors[(int)c];
             m.color = baseCol;
 
-            if (c == BubbleColor.Bomb)
+            if (c == BubbleColor.Stone)
+            {
+                m.color = new Color(0.42f, 0.44f, 0.48f);
+                m.SetFloat("_Glossiness", 0.35f); // rough granite
+                m.SetFloat("_Metallic", 0.60f);   // iron ore
+                m.DisableKeyword("_EMISSION");
+            }
+            else if (c == BubbleColor.Bomb)
             {
                 m.color = new Color(0.14f, 0.14f, 0.18f);
                 m.SetFloat("_Glossiness", 0.90f);
@@ -97,6 +105,21 @@ namespace BubbleShooter
         /// <summary>Adds comprehensive 3D ornaments: inner optical refraction core, dual specular glints, and powerup accessories.</summary>
         public static void Add3DOrnaments(GameObject bubble, float radius, BubbleColor color)
         {
+            if (color == BubbleColor.Stone)
+            {
+                // Heavy iron reinforced collar band around stone blocker bubble
+                var band = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                band.name = "StoneIronBand";
+                Object.Destroy(band.GetComponent<Collider>());
+                band.transform.SetParent(bubble.transform, false);
+                band.transform.localScale = new Vector3(1.05f, 0.08f, 1.05f);
+                var bm = band.GetComponent<Renderer>().material;
+                bm.color = new Color(0.24f, 0.25f, 0.28f);
+                bm.SetFloat("_Metallic", 0.90f);
+                bm.SetFloat("_Glossiness", 0.70f);
+                return;
+            }
+
             Color baseCol = Colors[(int)color];
 
             // 1. Inner glowing 3D crystal core (creates volumetric refraction depth)

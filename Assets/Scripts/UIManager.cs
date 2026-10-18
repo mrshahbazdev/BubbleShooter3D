@@ -254,11 +254,35 @@ namespace BubbleShooter
             scoreText.text = $"SCORE {g.Score:N0}";
             highScoreText.text = $"BEST {g.HighScore:N0}";
             levelText.text = $"LEVEL {g.Level}";
-            movesText.text = $"MOVES {g.Moves}";
+
+            int remaining = g.MovesRemaining;
+            if (remaining <= 5)
+            {
+                movesText.text = $"⚠️ SHOTS {remaining}/{g.MaxMoves}";
+                movesText.color = new Color(1f, 0.25f, 0.25f);
+            }
+            else
+            {
+                movesText.text = $"SHOTS {remaining}/{g.MaxMoves}";
+                movesText.color = new Color(1f, 0.88f, 0.35f);
+            }
 
             int shotsLeft = g.ShotsUntilDescend;
-            pressureText.text = shotsLeft <= 1 ? "⚠️ CEILING DROP NEXT!" : $"CEILING IN {shotsLeft}";
-            pressureText.color = shotsLeft <= 1 ? new Color(1f, 0.3f, 0.3f) : new Color(1f, 0.65f, 0.3f);
+            int total = g.ShotsPerDescend;
+            string dots = "";
+            for (int i = 0; i < total; i++)
+                dots += (i < total - shotsLeft) ? "● " : "○ ";
+
+            if (shotsLeft <= 1)
+            {
+                pressureText.text = $"⚠️ DROP NEXT! [{dots.Trim()}]";
+                pressureText.color = new Color(1f, 0.3f, 0.3f);
+            }
+            else
+            {
+                pressureText.text = $"CEILING [{dots.Trim()}]";
+                pressureText.color = new Color(1f, 0.65f, 0.3f);
+            }
 
             // Power-up button updates
             var shooter = g.Shooter;
@@ -310,13 +334,14 @@ namespace BubbleShooter
                 2 => "★ ★ ☆",
                 _ => "★ ☆ ☆"
             };
-            winScoreText.text = $"SCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}";
+            winScoreText.text = $"SCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}\n\n<color=#4ADE80>SHOTS CONSERVED: {GameManager.I.MovesRemaining}</color>";
         }
 
         public void ShowLose(int score, int level)
         {
             losePanel.SetActive(true);
-            loseScoreText.text = $"SCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}";
+            string reason = GameManager.I.MovesRemaining <= 0 ? "OUT OF SHOTS!" : "BUBBLES CROSSED THE LINE!";
+            loseScoreText.text = $"<color=#F87171>{reason}</color>\n\nSCORE {score:N0}\nHIGH {GameManager.I.HighScore:N0}";
         }
     }
 }
