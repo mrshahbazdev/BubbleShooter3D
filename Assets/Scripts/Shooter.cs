@@ -54,13 +54,26 @@ namespace BubbleShooter
             sm.color = new Color(0.22f, 0.24f, 0.30f);
             sm.SetFloat("_Glossiness", 0.8f);
 
+            // glowing muzzle ring
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "MuzzleRing";
+            Destroy(ring.GetComponent<Collider>());
+            ring.transform.SetParent(transform, false);
+            ring.transform.localPosition = new Vector3(0f, 0.92f, 0f);
+            ring.transform.localScale = new Vector3(1.05f, 0.03f, 1.05f);
+            var rm = ring.GetComponent<Renderer>().material;
+            rm.color = new Color(0.1f, 0.75f, 1f);
+            rm.EnableKeyword("_EMISSION");
+            rm.SetColor("_EmissionColor", new Color(0.05f, 0.5f, 0.8f));
+
             // trajectory line
             var lineGo = new GameObject("Trajectory");
             line = lineGo.AddComponent<LineRenderer>();
             line.positionCount = 0;
             line.startWidth = line.endWidth = 0.06f;
             line.material = new Material(Shader.Find("Sprites/Default"));
-            line.startColor = line.endColor = new Color(1f, 1f, 1f, 0.55f);
+            line.startColor = new Color(0.4f, 0.9f, 1f, 0.8f);
+            line.endColor = new Color(0.4f, 0.9f, 1f, 0.1f);
             line.textureMode = LineTextureMode.Tile;
             line.numCornerVertices = 4;
             line.numCapVertices = 4;
@@ -74,6 +87,8 @@ namespace BubbleShooter
             nextGo.transform.SetParent(transform, false);
             nextGo.transform.localPosition = new Vector3(1.5f, 0.3f, 0f);
             nextGo.transform.localScale = Vector3.one * Radius * 1.4f;
+            BubblePalette.AddGloss(currentGo, Radius);
+            BubblePalette.AddGloss(nextGo, Radius);
 
             Reload(first: true);
         }
@@ -169,7 +184,15 @@ namespace BubbleShooter
             bool bomb = BombArmed;
             var color = bomb ? BubbleColor.Bomb : Current;
             if (bomb) GameManager.I.BombsLeft--;
+            var trail = go.AddComponent<TrailRenderer>();
+            trail.time = 0.25f;
+            trail.startWidth = Radius * 1.4f;
+            trail.endWidth = 0f;
+            trail.material = new Material(Shader.Find("Sprites/Default"));
+            trail.startColor = BubblePalette.Colors[(int)color];
+            trail.endColor = new Color(0f, 0f, 0f, 0f);
             active.Launch(color, bomb, muzzle, dir, board, Radius);
+            EffectsManager.I.Burst(muzzle, color);
             currentGo.transform.localScale = Vector3.zero;
             line.positionCount = 0;
             AudioManager.I.Play("shoot");

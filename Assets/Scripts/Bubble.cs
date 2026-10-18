@@ -28,8 +28,8 @@ namespace BubbleShooter
             transform.localScale = Vector3.one * radius * 2f;
             rend = GetComponent<Renderer>();
             rainbowPhase = Random.value * 6f;
-            if (color != BubbleColor.Rainbow)
-                rend.sharedMaterial = BubblePalette.CreateMaterial(color);
+            rend.sharedMaterial = BubblePalette.CreateMaterial(color);
+            BubblePalette.AddGloss(gameObject, radius);
         }
 
         void Update()

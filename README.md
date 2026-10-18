@@ -26,7 +26,8 @@ A complete 3D bubble shooter built with **Unity 2022.3 LTS + C#** — no externa
 
 ## How to run
 
-1. Install **Unity Hub** and **Unity 2022.3 LTS** (any 2021.3+ works too).
+1. Install **Unity Hub** and a supported editor — **Unity 6** (6000.x) or **Unity 2022.3 LTS up to 2022.3.62f1**.
+   - Note: 2022.3.63f1+ builds are *Extended LTS* and require an Enterprise/Industry license — they will not activate on a Personal license. Verified end-to-end on **Unity 6000.6.6f1** (compile + editor smoke tests).
 2. Unity Hub → **Open** → select this folder.
 3. Open `Assets/Scenes/Main.unity` and press **Play**.
 

@@ -21,6 +21,7 @@ namespace BubbleShooter
             camGo.transform.rotation = Quaternion.Euler(6f, 0f, 0f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.05f, 0.06f, 0.10f);
+            camGo.AddComponent<AudioListener>();
 
             // Lighting
             var key = new GameObject("KeyLight").AddComponent<Light>();
@@ -35,6 +36,36 @@ namespace BubbleShooter
             fill.transform.rotation = Quaternion.Euler(20f, 140f, 0f);
             RenderSettings.ambientLight = new Color(0.22f, 0.24f, 0.32f);
 
+            // Accent point lights for depth (cyan left, magenta right)
+            foreach (var (x, c) in new[] { (-9f, new Color(0.1f, 0.7f, 1f)), (9f, new Color(0.9f, 0.2f, 0.7f)) })
+            {
+                var pl = new GameObject("AccentLight").AddComponent<Light>();
+                pl.type = LightType.Point;
+                pl.color = c;
+                pl.intensity = 1.6f;
+                pl.range = 14f;
+                pl.transform.position = new Vector3(x, 1f, -4f);
+            }
+
+            // Starfield behind the board
+            var stars = new GameObject("Starfield");
+            stars.transform.position = new Vector3(0f, 1.6f, 6f);
+            var sps = stars.AddComponent<ParticleSystem>();
+            var smain = sps.main;
+            smain.startLifetime = 999f;
+            smain.startSpeed = 0f;
+            smain.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.18f);
+            smain.startColor = new Color(1f, 1f, 1f, 0.85f);
+            smain.maxParticles = 160;
+            var sem = sps.emission;
+            sem.rateOverTime = 0;
+            sem.SetBursts(new[] { new ParticleSystem.Burst(0f, 140) });
+            var sshape = sps.shape;
+            sshape.shapeType = ParticleSystemShapeType.Box;
+            sshape.scale = new Vector3(24f, 18f, 1f);
+            stars.GetComponent<ParticleSystemRenderer>().material =
+                new Material(Shader.Find("Particles/Standard Unlit"));
+
             // Backdrop panel behind the board
             var back = GameObject.CreatePrimitive(PrimitiveType.Cube);
             back.name = "Backdrop";
@@ -44,6 +75,17 @@ namespace BubbleShooter
             var backMat = back.GetComponent<Renderer>().material;
             backMat.color = new Color(0.08f, 0.10f, 0.16f);
             backMat.SetFloat("_Glossiness", 0.3f);
+
+            // Glossy floor the scene reflects on
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.name = "Floor";
+            Destroy(floor.GetComponent<Collider>());
+            floor.transform.position = new Vector3(0f, -5.4f, 2f);
+            floor.transform.localScale = new Vector3(22f, 0.25f, 10f);
+            var fm = floor.GetComponent<Renderer>().material;
+            fm.color = new Color(0.07f, 0.08f, 0.12f);
+            fm.SetFloat("_Glossiness", 0.9f);
+            fm.SetFloat("_Metallic", 0.6f);
 
             // Side rails (visual walls the shots bounce off)
             var board = new GameObject("Board").AddComponent<BubbleBoard>();
@@ -82,6 +124,7 @@ namespace BubbleShooter
             dm.color = new Color(0.9f, 0.15f, 0.2f);
             dm.EnableKeyword("_EMISSION");
             dm.SetColor("_EmissionColor", new Color(0.5f, 0.05f, 0.1f));
+            StartCoroutine(PulseDeathLine(dl));
 
             // Managers
             gameObject.AddComponent<AudioManager>();
@@ -91,6 +134,19 @@ namespace BubbleShooter
             var shooter = new GameObject("Shooter").AddComponent<Shooter>();
             shooter.Init(board, cam);
             gm.Init(board, shooter);
+        }
+
+        static System.Collections.IEnumerator PulseDeathLine(GameObject dl)
+        {
+            var r = dl.GetComponent<Renderer>().material;
+            float t = 0f;
+            while (dl != null)
+            {
+                t += Time.deltaTime;
+                float k = 0.35f + 0.25f * Mathf.Sin(t * 3f);
+                r.SetColor("_EmissionColor", new Color(k + 0.2f, k * 0.15f, k * 0.2f));
+                yield return null;
+            }
         }
     }
 }

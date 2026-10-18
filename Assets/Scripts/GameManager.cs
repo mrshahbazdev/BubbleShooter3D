@@ -60,6 +60,16 @@ namespace BubbleShooter
             float t = 0; Vector3 from = b.transform.position;
             while (t < 0.12f) { t += Time.deltaTime; b.transform.position = Vector3.Lerp(from, target, t / 0.12f); yield return null; }
             b.transform.position = target;
+            // squash-and-stretch settle
+            Vector3 s = b.transform.localScale;
+            float k = 0;
+            while (k < 0.15f)
+            {
+                k += Time.deltaTime;
+                b.transform.localScale = s * (1f + 0.25f * Mathf.Sin(k / 0.15f * Mathf.PI));
+                yield return null;
+            }
+            b.transform.localScale = s;
         }
 
         IEnumerator Resolve(Bubble placed)
@@ -71,6 +81,7 @@ namespace BubbleShooter
                 popped = MatchSolver.GetRadius(Board, placed.Row, placed.Col, 1);
                 AudioManager.I.Play("bomb");
                 EffectsManager.I.Shockwave(placed.transform.position);
+                EffectsManager.I.Shake(0.35f);
             }
             else
             {
@@ -93,6 +104,8 @@ namespace BubbleShooter
                 }
                 AudioManager.I.Play("pop");
                 Score += popped.Count * 10 * Combo;
+                EffectsManager.I.Popup(placed.transform.position,
+                    "+" + popped.Count * 10 * Combo, new Color(1f, 0.85f, 0.2f));
 
                 yield return new WaitForSeconds(0.25f);
                 var floating = MatchSolver.GetFloating(Board);
@@ -104,7 +117,13 @@ namespace BubbleShooter
                     StartCoroutine(bub.DropAnim());
                     dropped++;
                 }
-                if (dropped > 0) { Score += dropped * 25; AudioManager.I.Play("drop"); }
+                if (dropped > 0)
+                {
+                    Score += dropped * 25;
+                    AudioManager.I.Play("drop");
+                    EffectsManager.I.Popup(new Vector3(0f, 0f, 0f),
+                        "+" + dropped * 25 + " DROP", new Color(0.4f, 0.9f, 1f));
+                }
                 shotsSinceDescend = 0;
             }
             else

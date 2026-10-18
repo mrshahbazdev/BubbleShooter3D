@@ -44,7 +44,7 @@ namespace BubbleShooter
         }
 
         Text MakeText(Transform parent, string name, string content, int size,
-                      TextAnchor anchor, Vector2 pos)
+                      TextAnchor anchor, Vector2 pos, Vector2 anchorPoint)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -53,6 +53,9 @@ namespace BubbleShooter
             t.alignment = anchor; t.color = Color.white;
             t.supportRichText = false;
             var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = anchorPoint;
+            rt.anchorMax = anchorPoint;
+            rt.pivot = anchorPoint;
             rt.sizeDelta = new Vector2(600, size + 20);
             rt.anchoredPosition = pos;
             var shadow = go.AddComponent<Shadow>();
@@ -81,11 +84,23 @@ namespace BubbleShooter
             var btn = go.AddComponent<Button>();
             var rt = go.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(260, 64); rt.anchoredPosition = pos;
-            var t = MakeText(go.transform, "Label", label, 26, TextAnchor.MiddleCenter, Vector2.zero);
+            var t = MakeText(go.transform, "Label", label, 26, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(0.5f, 0.5f));
             t.GetComponent<RectTransform>().sizeDelta = rt.sizeDelta;
             btn.targetGraphic = img;
             btn.onClick.AddListener(() => AudioManager.I.Play("click"));
             return btn;
+        }
+
+        GameObject MakeChip(Transform parent, Vector2 anchorPoint, Vector2 pos, Vector2 size, Color tint)
+        {
+            var go = new GameObject("Chip");
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.color = tint;
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = anchorPoint; rt.anchorMax = anchorPoint; rt.pivot = anchorPoint;
+            rt.sizeDelta = size; rt.anchoredPosition = pos;
+            return go;
         }
 
         void BuildHud()
@@ -93,28 +108,42 @@ namespace BubbleShooter
             var canvas = MakeCanvas();
             var root = canvas.transform;
 
-            scoreText = MakeText(root, "Score", "SCORE 0", 30, TextAnchor.UpperLeft, new Vector2(320, -30));
-            levelText = MakeText(root, "Level", "LEVEL 1", 30, TextAnchor.UpperCenter, new Vector2(0, -30));
-            movesText = MakeText(root, "Moves", "MOVES 0", 26, TextAnchor.UpperRight, new Vector2(-320, -30));
-            comboText = MakeText(root, "Combo", "", 34, TextAnchor.MiddleCenter, new Vector2(0, -120));
+            var topLeft = new Vector2(0f, 1f);
+            var topCenter = new Vector2(0.5f, 1f);
+            var topRight = new Vector2(1f, 1f);
+            var center = new Vector2(0.5f, 0.5f);
+            var bottomLeft = new Vector2(0f, 0f);
+            var bottomCenter = new Vector2(0.5f, 0f);
+
+            MakeChip(root, topLeft, new Vector2(12, -10), new Vector2(210, 46), new Color(0f, 0f, 0f, 0.55f));
+            MakeChip(root, topCenter, new Vector2(0, -10), new Vector2(190, 46), new Color(0f, 0f, 0f, 0.55f));
+            MakeChip(root, topRight, new Vector2(-12, -10), new Vector2(210, 46), new Color(0f, 0f, 0f, 0.55f));
+            MakeChip(root, bottomLeft, new Vector2(12, 12), new Vector2(180, 40), new Color(0f, 0f, 0f, 0.55f));
+
+            scoreText = MakeText(root, "Score", "SCORE 0", 30, TextAnchor.UpperLeft, new Vector2(26, -17), topLeft);
+            scoreText.color = new Color(1f, 0.85f, 0.2f);
+            levelText = MakeText(root, "Level", "LEVEL 1", 30, TextAnchor.UpperCenter, new Vector2(0, -17), topCenter);
+            levelText.color = new Color(0.4f, 0.9f, 1f);
+            movesText = MakeText(root, "Moves", "MOVES 0", 26, TextAnchor.UpperRight, new Vector2(-26, -20), topRight);
+            comboText = MakeText(root, "Combo", "", 34, TextAnchor.MiddleCenter, new Vector2(0, -110), center);
             comboText.color = new Color(1f, 0.85f, 0.2f);
-            bombsText = MakeText(root, "Bombs", "BOMB [B] x2", 22, TextAnchor.LowerLeft, new Vector2(320, 30));
+            bombsText = MakeText(root, "Bombs", "BOMB [B] x2", 22, TextAnchor.LowerLeft, new Vector2(20, 20), bottomLeft);
             MakeText(root, "Hint", "Aim: mouse   Fire: click   Swap: X   Bomb: B",
-                     18, TextAnchor.LowerCenter, new Vector2(0, 24))
+                     18, TextAnchor.LowerCenter, new Vector2(0, 18), bottomCenter)
                 .color = new Color(1f, 1f, 1f, 0.45f);
 
-            bannerText = MakeText(root, "Banner", "", 54, TextAnchor.MiddleCenter, new Vector2(0, 60));
+            bannerText = MakeText(root, "Banner", "", 54, TextAnchor.MiddleCenter, new Vector2(0, 60), center);
 
             winPanel = MakePanel(root, "WinPanel");
             MakeText(winPanel.transform, "WinTitle", "LEVEL CLEARED!", 64,
-                     TextAnchor.MiddleCenter, new Vector2(0, 140)).color = new Color(0.3f, 1f, 0.5f);
+                     TextAnchor.MiddleCenter, new Vector2(0, 140), center).color = new Color(0.3f, 1f, 0.5f);
             var next = MakeButton(winPanel.transform, "NEXT LEVEL", new Vector2(0, -40));
             next.onClick.AddListener(() => { winPanel.SetActive(false); GameManager.I.NextLevel(); });
             winPanel.SetActive(false);
 
             losePanel = MakePanel(root, "LosePanel");
             MakeText(losePanel.transform, "LoseTitle", "GAME OVER", 64,
-                     TextAnchor.MiddleCenter, new Vector2(0, 140)).color = new Color(1f, 0.35f, 0.35f);
+                     TextAnchor.MiddleCenter, new Vector2(0, 140), center).color = new Color(1f, 0.35f, 0.35f);
             var retry = MakeButton(losePanel.transform, "RETRY", new Vector2(0, -40));
             retry.onClick.AddListener(() => { losePanel.SetActive(false); GameManager.I.Restart(); });
             losePanel.SetActive(false);
@@ -143,14 +172,14 @@ namespace BubbleShooter
         {
             winPanel.SetActive(true);
             MakeText(winPanel.transform, "Score", $"SCORE {score}", 34,
-                     TextAnchor.MiddleCenter, new Vector2(0, 40));
+                     TextAnchor.MiddleCenter, new Vector2(0, 40), new Vector2(0.5f, 0.5f));
         }
 
         public void ShowLose(int score, int level)
         {
             losePanel.SetActive(true);
             MakeText(losePanel.transform, "Score", $"SCORE {score}", 34,
-                     TextAnchor.MiddleCenter, new Vector2(0, 40));
+                     TextAnchor.MiddleCenter, new Vector2(0, 40), new Vector2(0.5f, 0.5f));
         }
     }
 }
