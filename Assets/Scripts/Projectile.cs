@@ -28,10 +28,10 @@ namespace BubbleShooter
             transform.position = origin;
             dir = direction.normalized; dir.z = 0f;
             transform.localScale = Vector3.one * radius * 2f;
-            Speed = color == BubbleColor.Lightning ? 28f : (color == BubbleColor.Fireball ? 25f : 22f);
+            Speed = color == BubbleColor.Lightning ? 32f : (color == BubbleColor.Fireball ? 28f : 25f);
             var rend = GetComponent<Renderer>();
             rend.sharedMaterial = BubblePalette.CreateMaterial(color);
-            BubblePalette.AddGloss(gameObject, radius);
+            BubblePalette.Add3DOrnaments(gameObject, radius, color);
         }
 
         float lifetime;
@@ -40,9 +40,12 @@ namespace BubbleShooter
         {
             if (done) return;
             lifetime += Time.deltaTime;
-            if (lifetime > 2.5f)
+            // 8-second safety watchdog only — never snaps in mid-air
+            if (lifetime > 8f)
             {
-                Snap(board.FindCeilingCell(transform.position), transform.position);
+                done = true;
+                GameManager.I.OnProjectileLost(this);
+                Destroy(gameObject);
                 return;
             }
             float step = Speed * Time.deltaTime;
@@ -64,6 +67,7 @@ namespace BubbleShooter
             {
                 p.x = lim;
                 dir.x = -dir.x;
+                if (AudioManager.I != null) AudioManager.I.Play("click");
             }
 
             // Fireball: pierce through bubbles

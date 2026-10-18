@@ -13,7 +13,7 @@ namespace BubbleShooter
     public class Shooter : MonoBehaviour
     {
         public float Radius = 0.48f;
-        public int TrajectoryBounces = 3;
+        public int TrajectoryBounces = 8;
 
         BubbleBoard board;
         GameObject currentGo, nextGo, ghostGo;
@@ -280,8 +280,12 @@ namespace BubbleShooter
             }
 
             Vector3 d = new Vector3(world.x - transform.position.x, world.y - transform.position.y, 0f);
-            if (d.y < 0.15f) d = new Vector3(d.x, 0.15f, 0f);
-            return d.normalized;
+            float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+            // Real arcade clamp: 16 degrees minimum from horizontal
+            // prevents near-horizontal stall while allowing deep bank shots
+            angle = Mathf.Clamp(angle, 16f, 164f);
+            float rad = angle * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
         }
 
         void Update()
@@ -333,7 +337,7 @@ namespace BubbleShooter
             int bounces = 0;
             Vector2Int? predictedCell = null;
 
-            for (int guard = 0; guard < 400; guard++)
+            for (int guard = 0; guard < 700; guard++)
             {
                 Vector3 next = p + d * (Radius * 0.5f);
                 float lim = (d.x < 0 ? board.LeftWallX : board.RightWallX) + (d.x < 0 ? Radius : -Radius);
