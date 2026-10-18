@@ -414,10 +414,8 @@ namespace BubbleShooter
             {
                 ghostGo.SetActive(true);
                 Vector3 ghostPos = board.CellToWorld(predictedCell.Value.x, predictedCell.Value.y);
-                ghostGo.transform.position = ghostPos;
                 float pulse = 1f + 0.08f * Mathf.Sin(Time.time * 8f);
                 ghostGo.transform.localScale = Vector3.one * Radius * 1.9f * pulse;
-                Color activeCol = BubblePalette.Colors[(int)GetActiveColor()];
                 ghostGo.GetComponent<Renderer>().sharedMaterial =
                     BubblePalette.CreateGhostMaterial(GetActiveColor());
 
